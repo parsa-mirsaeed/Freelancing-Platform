@@ -1,0 +1,196 @@
+name: PR Gate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      domains: ${{ steps.impact.outputs.domains }}
+      python: ${{ steps.impact.outputs.python }}
+      database: ${{ steps.impact.outputs.database }}
+      redis: ${{ steps.impact.outputs.redis }}
+      ci: ${{ steps.impact.outputs.ci }}
+      docker: ${{ steps.impact.outputs.docker }}
+      docs: ${{ steps.impact.outputs.docs }}
+      unit_targets: ${{ steps.impact.outputs.unit_targets }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install impact detector dependency
+        run: python -m pip install --disable-pip-version-check PyYAML~=6.0
+      - name: Detect affected domains
+        id: impact
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/changed-files.txt
+          python ci/impact.py --paths-file /tmp/changed-files.txt --github-output
+
+  metadata:
+    name: Config validation
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check PyYAML~=6.0
+      - run: python ci/impact.py --validate-config
+      - run: python -m compileall -q ci
+
+  quality:
+    name: Python quality
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: ruff check app ci tests
+      - run: ruff format --check app ci tests
+      - run: mypy app ci
+
+  unit:
+    name: Affected unit tests
+    needs: changes
+    if: needs.changes.outputs.python == 'true' && needs.changes.outputs.unit_targets != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - name: Run selected unit tests
+        run: pytest -m unit ${{ needs.changes.outputs.unit_targets }}
+
+  database:
+    name: PostgreSQL migration + integration
+    needs: changes
+    if: needs.changes.outputs.database == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: freelancing
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d freelancing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/freelancing
+      SECRET_KEY: ci-only-secret
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: alembic upgrade head
+      - run: alembic check
+      - run: pytest -m db tests/integration/test_database.py
+
+  redis:
+    name: Redis integration
+    needs: changes
+    if: needs.changes.outputs.redis == 'true'
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      REDIS_URL: redis://localhost:6379/15
+      SECRET_KEY: ci-only-secret
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: pytest -m redis tests/integration/test_redis.py
+
+  docs:
+    name: Markdown formatting
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check Markdown hygiene
+        run: python ci/check_markdown.py $(git ls-files '*.md')
+
+  image:
+    name: Container build
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: freelancing-platform:pr
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  gate:
+    name: gate
+    if: always()
+    needs: [changes, metadata, quality, unit, database, redis, docs, image]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required jobs
+        run: >-
+          python ci/verify_gate.py
+          changes=${{ needs.changes.result }}
+          metadata=${{ needs.metadata.result }}
+          quality=${{ needs.quality.result }}
+          unit=${{ needs.unit.result }}
+          database=${{ needs.database.result }}
+          redis=${{ needs.redis.result }}
+          docs=${{ needs.docs.result }}
+          image=${{ needs.image.result }}

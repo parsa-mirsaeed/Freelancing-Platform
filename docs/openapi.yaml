@@ -1,0 +1,127 @@
+openapi: 3.1.0
+info:
+  title: Freelancing Platform API
+  version: 0.1.0
+servers:
+  - url: /api/v1
+paths:
+  /auth/register:
+    post:
+      summary: Register a freelancer or employer account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '409':
+          $ref: '#/components/responses/ApiError'
+        '422':
+          $ref: '#/components/responses/ApiError'
+  /auth/login:
+    post:
+      summary: Authenticate an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, format: email}
+                password: {type: string, format: password}
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/ApiError'
+  /auth/refresh:
+    post:
+      summary: Rotate a refresh session and issue fresh tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: {type: string}
+      responses:
+        '200': {description: Tokens rotated}
+        '401':
+          $ref: '#/components/responses/ApiError'
+  /auth/logout:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Revoke the current refresh session
+      responses:
+        '204': {description: Session revoked}
+        '401':
+          $ref: '#/components/responses/ApiError'
+  /auth/me:
+    get:
+      security: [{bearerAuth: []}]
+      summary: Get the authenticated account identity
+      responses:
+        '200': {description: Authenticated user}
+        '401':
+          $ref: '#/components/responses/ApiError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    ApiError:
+      description: Standard API error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email: {type: string, format: email}
+        password: {type: string, format: password, minLength: 12}
+        role: {type: string, enum: [freelancer, employer]}
+    TokenResponse:
+      type: object
+      required: [user, access_token, refresh_token, token_type]
+      properties:
+        user:
+          type: object
+          required: [id, email, roles]
+          properties:
+            id: {type: string, format: uuid}
+            email: {type: string, format: email}
+            roles:
+              type: array
+              items: {type: string}
+        access_token: {type: string}
+        refresh_token: {type: string}
+        token_type: {type: string, const: Bearer}
+    ApiError:
+      type: object
+      required: [type, title, status, detail, request_id]
+      properties:
+        type: {type: string}
+        title: {type: string}
+        status: {type: integer}
+        detail: {type: string}
+        request_id: {type: [string, 'null']}

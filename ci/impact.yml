@@ -1,0 +1,52 @@
+domains:
+  shared:
+    paths:
+      - app/__init__.py
+      - app/config.py
+      - app/extensions.py
+      - app/errors.py
+      - app/common/**
+      - pyproject.toml
+    unit:
+      - tests/unit
+    flags: [python, database, redis]
+  identity:
+    paths:
+      - app/identity/**
+      - tests/unit/identity/**
+    unit:
+      - tests/unit/identity
+    integration:
+      - tests/integration/test_database.py
+    flags: [python, database]
+  audit:
+    paths:
+      - app/audit/**
+      - tests/unit/audit/**
+    unit:
+      - tests/unit/audit
+    integration:
+      - tests/integration/test_database.py
+    flags: [python, database]
+  database:
+    paths:
+      - migrations/**
+      - alembic.ini
+    integration:
+      - tests/integration/test_database.py
+    flags: [python, database]
+  ci:
+    paths:
+      - ci/**
+      - .github/workflows/**
+    flags: [ci]
+  docker:
+    paths:
+      - Dockerfile
+      - infra/docker/**
+    flags: [docker]
+  docs:
+    paths:
+      - README.md
+      - docs/**
+    flags: [docs]
