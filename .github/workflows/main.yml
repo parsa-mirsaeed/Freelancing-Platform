@@ -1,0 +1,67 @@
+name: Main
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main
+  cancel-in-progress: true
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: freelancing
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d freelancing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/freelancing
+      REDIS_URL: redis://localhost:6379/15
+      SECRET_KEY: ci-only-secret
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: ruff check app ci tests
+      - run: mypy app ci
+      - run: pytest -m unit tests/unit
+      - run: alembic upgrade head
+      - run: alembic check
+      - run: pytest -m 'db or redis' tests/integration
+
+  image:
+    needs: core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: freelancing-platform:${{ github.sha }}
