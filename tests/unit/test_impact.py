@@ -12,7 +12,24 @@ def test_identity_change_selects_only_identity_core() -> None:
     assert result["domains"] == ["identity"]
     assert result["flags"]["database"] is True
     assert result["flags"]["redis"] is False
+    assert result["flags"]["search"] is False
     assert result["unit_targets"] == ["tests/unit/identity"]
+
+
+def test_freelancer_change_selects_search_projection() -> None:
+    result = calculate(["app/freelancers/service.py"], load_config())
+    assert result["domains"] == ["freelancers"]
+    assert result["flags"]["database"] is True
+    assert result["flags"]["search"] is True
+    assert result["unit_targets"] == ["tests/unit/freelancers"]
+
+
+def test_gig_change_does_not_start_elasticsearch() -> None:
+    result = calculate(["app/gigs/service.py"], load_config())
+    assert result["domains"] == ["gigs"]
+    assert result["flags"]["database"] is True
+    assert result["flags"]["search"] is False
+    assert result["unit_targets"] == ["tests/unit/gigs"]
 
 
 def test_shared_change_runs_full_unit_and_core_services() -> None:
@@ -20,6 +37,7 @@ def test_shared_change_runs_full_unit_and_core_services() -> None:
     assert result["domains"] == ["shared"]
     assert result["unit_targets"] == ["tests/unit"]
     assert result["flags"]["redis"] is True
+    assert result["flags"]["search"] is True
 
 
 def test_unknown_change_falls_back_to_full_core() -> None:
@@ -27,6 +45,7 @@ def test_unknown_change_falls_back_to_full_core() -> None:
     assert result["domains"] == ["fallback-full-core"]
     assert result["unit_targets"] == ["tests/unit"]
     assert result["integration_targets"] == ["tests/integration"]
+    assert result["flags"]["search"] is True
 
 
 def test_github_output_is_shell_safe(tmp_path: Path) -> None:
@@ -36,3 +55,4 @@ def test_github_output_is_shell_safe(tmp_path: Path) -> None:
     text = destination.read_text()
     assert "docs=true" in text
     assert "python=false" in text
+    assert "search=false" in text
