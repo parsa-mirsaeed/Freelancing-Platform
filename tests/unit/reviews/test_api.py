@@ -8,7 +8,7 @@ from tests.helpers import auth_header, register_user
 pytestmark = pytest.mark.unit
 
 
-def test_review_requires_closed_project_with_accepted_proposal(
+def test_review_requires_completed_contract_backed_project(
     client,  # type: ignore[no-untyped-def]
 ) -> None:
     employer = register_user(client, email="review-employer@example.com", role="employer")
@@ -51,6 +51,19 @@ def test_review_requires_closed_project_with_accepted_proposal(
         json={"rating": 5, "comment": "Great"},
     )
     assert early.status_code == 409
+
+    contract = client.get(
+        f"/api/v1/projects/{project['id']}/contract", headers=auth_header(employer)
+    ).get_json()
+    document_hash = contract["version"]["document_hash"]
+    for key, user in (("review-employer-sign", employer), ("review-freelancer-sign", freelancer)):
+        signed = client.post(
+            f"/api/v1/contracts/{contract['id']}/sign",
+            headers={**auth_header(user), "Idempotency-Key": key},
+            json={"document_hash": document_hash},
+        )
+        assert signed.status_code == 200
+
     assert (
         client.post(
             f"/api/v1/projects/{project['id']}/close", headers=auth_header(employer)

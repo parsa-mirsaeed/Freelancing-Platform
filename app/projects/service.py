@@ -111,7 +111,8 @@ def update_project(
 
 
 def close_project(*, user: User, project_id: uuid.UUID) -> Project:
-    from app.proposals.models import Proposal
+    from app.contracts.models import Contract, ContractVersion
+    from app.milestones.models import Milestone
 
     project = get_project(project_id)
     if not can_edit_project(user, project):
@@ -123,24 +124,44 @@ def close_project(*, user: User, project_id: uuid.UUID) -> Project:
             409,
             "Only OPEN projects can close",
         )
-    accepted = db.session.scalar(
-        select(Proposal).where(Proposal.project_id == project.id, Proposal.status == "ACCEPTED")
-    )
-    if accepted is None:
+    contract = db.session.scalar(select(Contract).where(Contract.project_id == project.id))
+    if contract is None or contract.status != "ACTIVE":
         raise ApiError(
             "invalid_state",
             "Project cannot close",
             409,
-            "A project needs an accepted proposal before it can close",
+            "The project contract must be active before the project can close",
+        )
+    current_version_id = db.session.scalar(
+        select(ContractVersion.id).where(
+            ContractVersion.contract_id == contract.id,
+            ContractVersion.version_number == contract.current_version,
+        )
+    )
+    if current_version_id is None:
+        raise RuntimeError("Contract current_version does not reference a version")
+    incomplete = db.session.scalar(
+        select(Milestone.id).where(
+            Milestone.contract_version_id == current_version_id,
+            Milestone.status.not_in({"APPROVED", "RELEASE_PENDING", "RELEASED"}),
+        )
+    )
+    if incomplete is not None:
+        raise ApiError(
+            "invalid_state",
+            "Project cannot close",
+            409,
+            "All contract milestones must be approved before the project can close",
         )
     project.status = "CLOSED"
-    profile = get_profile_by_user_id(accepted.freelancer_user_id)
+    profile = get_profile_by_user_id(contract.freelancer_user_id)
     touch_search_projection(profile)
     record_audit_event(
         action="project.closed",
         resource_type="project",
         resource_id=str(project.id),
         actor_user_id=user.id,
+        metadata={"contract_id": str(contract.id)},
     )
     db.session.commit()
     return project

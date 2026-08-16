@@ -1,6 +1,8 @@
 # Initial single-maintainer ownership. Replace with teams as contributors are added.
 /app/identity/ @parsa-mirsaeed
 /app/audit/ @parsa-mirsaeed
+/app/contracts/ @parsa-mirsaeed
+/app/milestones/ @parsa-mirsaeed
 /app/payments/ @parsa-mirsaeed
 /app/ledger/ @parsa-mirsaeed
 /migrations/ @parsa-mirsaeed

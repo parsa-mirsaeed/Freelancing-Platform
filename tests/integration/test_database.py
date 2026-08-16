@@ -157,6 +157,26 @@ def test_marketplace_round_trip_on_postgres() -> None:
             ).status_code
             == 200
         )
+
+        contract_response = client.get(
+            f"/api/v1/projects/{project_id}/contract", headers=employer_headers
+        )
+        assert contract_response.status_code == 200
+        contract = contract_response.get_json()
+        document_hash = contract["version"]["document_hash"]
+        for key, headers in (
+            (f"integration-employer-{suffix}", employer_headers),
+            (f"integration-freelancer-{suffix}", freelancer_headers),
+        ):
+            signed = client.post(
+                f"/api/v1/contracts/{contract['id']}/sign",
+                headers={**headers, "Idempotency-Key": key},
+                json={"document_hash": document_hash},
+            )
+            assert signed.status_code == 200
+            contract = signed.get_json()
+        assert contract["status"] == "ACTIVE"
+
         assert (
             client.post(
                 f"/api/v1/projects/{project_id}/close", headers=employer_headers

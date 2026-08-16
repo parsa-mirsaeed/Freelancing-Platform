@@ -1,0 +1,170 @@
+openapi: 3.1.0
+info:
+  title: Freelancing Platform Contract API
+  version: 0.3.0
+  description: Contract-phase API fragment. All paths are rooted at /api/v1.
+servers:
+  - url: /api/v1
+paths:
+  /projects/{project_id}/contract:
+    get:
+      security: [{bearerAuth: []}]
+      summary: Read the contract for a project as one of its parties
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200': {description: Contract, content: {application/json: {schema: {$ref: '#/components/schemas/Contract'}}}}
+        '403': {$ref: '#/components/responses/ApiError'}
+        '404': {$ref: '#/components/responses/ApiError'}
+  /contracts/{contract_id}:
+    get:
+      security: [{bearerAuth: []}]
+      summary: Read a contract as one of its parties
+      parameters:
+        - $ref: '#/components/parameters/ContractId'
+      responses:
+        '200': {description: Contract, content: {application/json: {schema: {$ref: '#/components/schemas/Contract'}}}}
+        '403': {$ref: '#/components/responses/ApiError'}
+        '404': {$ref: '#/components/responses/ApiError'}
+  /contracts/{contract_id}/sign:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Idempotently sign the current immutable contract version
+      parameters:
+        - $ref: '#/components/parameters/ContractId'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 200}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [document_hash]
+              properties:
+                document_hash: {type: string, pattern: '^[0-9a-f]{64}$'}
+                signature_provider_reference: {type: [string, 'null'], maxLength: 255}
+      responses:
+        '200': {description: Signature recorded or existing signature returned}
+        '403': {$ref: '#/components/responses/ApiError'}
+        '409': {$ref: '#/components/responses/ApiError'}
+        '422': {$ref: '#/components/responses/ApiError'}
+  /contracts/{contract_id}/cancel:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Cancel a contract as the employer before milestone work has started
+      parameters:
+        - $ref: '#/components/parameters/ContractId'
+      responses:
+        '200': {description: Contract cancelled or already cancelled}
+        '403': {$ref: '#/components/responses/ApiError'}
+        '409': {$ref: '#/components/responses/ApiError'}
+  /milestones/{milestone_id}:
+    get:
+      security: [{bearerAuth: []}]
+      summary: Read a milestone as a contract party
+      parameters:
+        - $ref: '#/components/parameters/MilestoneId'
+      responses:
+        '200': {description: Milestone, content: {application/json: {schema: {$ref: '#/components/schemas/Milestone'}}}}
+        '403': {$ref: '#/components/responses/ApiError'}
+        '404': {$ref: '#/components/responses/ApiError'}
+  /milestones/{milestone_id}/start:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Start a funded milestone as the freelancer
+      parameters: [{$ref: '#/components/parameters/MilestoneId'}]
+      responses:
+        '200': {description: Milestone moved to IN_PROGRESS}
+        '403': {$ref: '#/components/responses/ApiError'}
+        '409': {$ref: '#/components/responses/ApiError'}
+  /milestones/{milestone_id}/submit:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Submit or resubmit milestone work as the freelancer
+      parameters: [{$ref: '#/components/parameters/MilestoneId'}]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {note: {type: string, maxLength: 4000}}
+      responses:
+        '200': {description: Milestone moved to SUBMITTED or idempotently returned}
+        '403': {$ref: '#/components/responses/ApiError'}
+        '409': {$ref: '#/components/responses/ApiError'}
+  /milestones/{milestone_id}/request-changes:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Request changes on submitted work as the employer
+      parameters: [{$ref: '#/components/parameters/MilestoneId'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties: {note: {type: string, minLength: 1, maxLength: 4000}}
+      responses:
+        '200': {description: Milestone moved to CHANGES_REQUESTED}
+        '403': {$ref: '#/components/responses/ApiError'}
+        '409': {$ref: '#/components/responses/ApiError'}
+  /milestones/{milestone_id}/approve:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Approve submitted work as the employer
+      parameters: [{$ref: '#/components/parameters/MilestoneId'}]
+      responses:
+        '200': {description: Milestone moved to APPROVED or idempotently returned}
+        '403': {$ref: '#/components/responses/ApiError'}
+        '409': {$ref: '#/components/responses/ApiError'}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  parameters:
+    ProjectId: {name: project_id, in: path, required: true, schema: {type: string, format: uuid}}
+    ContractId: {name: contract_id, in: path, required: true, schema: {type: string, format: uuid}}
+    MilestoneId: {name: milestone_id, in: path, required: true, schema: {type: string, format: uuid}}
+  responses:
+    ApiError:
+      description: Standard API error
+  schemas:
+    Contract:
+      type: object
+      required: [id, project_id, status, current_version, parties, version]
+      properties:
+        id: {type: string, format: uuid}
+        project_id: {type: string, format: uuid}
+        accepted_proposal_id: {type: string, format: uuid}
+        employer_user_id: {type: string, format: uuid}
+        freelancer_user_id: {type: string, format: uuid}
+        status: {type: string, enum: [PENDING_SIGNATURES, ACTIVE, CANCELLED]}
+        current_version: {type: integer, minimum: 1}
+        parties: {type: array, items: {type: object}}
+        version:
+          type: object
+          properties:
+            id: {type: string, format: uuid}
+            version_number: {type: integer, minimum: 1}
+            document_hash: {type: string, pattern: '^[0-9a-f]{64}$'}
+            snapshot: {type: object}
+            signatures: {type: array, items: {type: object}}
+            milestones: {type: array, items: {$ref: '#/components/schemas/Milestone'}}
+    Milestone:
+      type: object
+      required: [id, sequence, title, amount_minor, currency, delivery_days, status, events]
+      properties:
+        id: {type: string, format: uuid}
+        sequence: {type: integer, minimum: 1}
+        title: {type: string}
+        amount_minor: {type: integer, minimum: 0}
+        currency: {type: string, minLength: 3, maxLength: 3}
+        delivery_days: {type: integer, minimum: 1}
+        status:
+          type: string
+          enum: [CREATED, FUNDED, IN_PROGRESS, SUBMITTED, CHANGES_REQUESTED, DISPUTED, APPROVED, RELEASE_PENDING, RELEASED]
+        events: {type: array, items: {type: object}}

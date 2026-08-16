@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.audit.service import record_audit_event
+from app.contracts.service import create_contract_from_accepted_proposal
 from app.errors import ApiError
 from app.extensions import db
 from app.identity.models import User
@@ -194,15 +195,21 @@ def transition_proposal(*, user: User, proposal_id: uuid.UUID, target: str) -> P
         raise ApiError("invalid_state", "Invalid project state", 409, "Project is not open")
 
     previous = proposal.status
-    proposal.status = target
-    record_audit_event(
-        action=f"proposal.{target.lower()}",
-        resource_type="proposal",
-        resource_id=str(proposal.id),
-        actor_user_id=user.id,
-        metadata={"from": previous, "to": target},
-    )
     try:
+        if target == "ACCEPTED":
+            create_contract_from_accepted_proposal(
+                proposal=proposal,
+                project=project,
+                actor_user_id=user.id,
+            )
+        proposal.status = target
+        record_audit_event(
+            action=f"proposal.{target.lower()}",
+            resource_type="proposal",
+            resource_id=str(proposal.id),
+            actor_user_id=user.id,
+            metadata={"from": previous, "to": target},
+        )
         db.session.commit()
     except IntegrityError as exc:
         db.session.rollback()
@@ -213,6 +220,9 @@ def transition_proposal(*, user: User, proposal_id: uuid.UUID, target: str) -> P
                 409,
                 "Only one proposal can be accepted for a project",
             ) from exc
+        raise
+    except ApiError:
+        db.session.rollback()
         raise
     return get_proposal(proposal.id)
 

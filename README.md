@@ -21,9 +21,18 @@ A skill-sharing and freelancing marketplace built as a domain-driven modular Fla
 - Gigs with Basic/Standard/Premium packages, delivery days, revisions, requirements, and integer minor-unit prices.
 - Employer projects with skills and integer minor-unit budget ranges.
 - Versioned proposals and enforced negotiation transitions; prior commercial terms are never overwritten.
-- Reviews gated by a closed employer-owned project and an accepted proposal. This is an interim marketplace-level eligibility rule until contract/milestone completion becomes authoritative in the Contract phase.
 - PostgreSQL transactional outbox events for freelancer search refreshes.
 - Elasticsearch 9.x freelancer projection with monotonic projection versions and lexical/filter search.
+
+### Contract
+
+- Proposal acceptance atomically creates one contract backed by an immutable snapshot of the accepted proposal's current version and project scope.
+- Contract Version 1 stores a canonical SHA-256 document hash, two required parties, and milestone commercial values copied from the signed snapshot.
+- Employer and freelancer signatures are hash-bound and idempotency-key protected; the contract activates only after both required signatures exist.
+- Contract versions, signatures, and milestone progress events are append-only at the ORM layer and protected against direct mutation by PostgreSQL triggers.
+- Milestone execution progress supports freelancer start/submit/resubmit and employer request-changes/approve transitions with resource-level authorization and idempotent repeated transitions.
+- Project close and reviews are contract-backed: the contract must be active, and current-version milestones must be approved before close.
+- Financial milestone transitions are intentionally reserved for the Money phase: funding, release, ledger, commission, refund, and payout authority are not implemented here.
 
 ## Local development
 
@@ -82,7 +91,7 @@ mypy app ci
 pytest -m unit tests/unit
 ```
 
-Integration tests require the corresponding real service. PR CI starts PostgreSQL, Redis, or Elasticsearch only when the impact detector selects that dependency.
+Integration tests require the corresponding real service. PR CI starts PostgreSQL, Redis, or Elasticsearch only when the impact detector selects that dependency. Contract and milestone changes select the focused PostgreSQL contract integration test in addition to any other affected database smoke tests.
 
 ## Architecture rules
 
@@ -90,6 +99,6 @@ PostgreSQL is the source of truth. Redis is ephemeral. Elasticsearch is a rebuil
 
 HTTP controllers stay thin: controller → application/domain service → repository/external adapter. Business-state transitions and authorization decisions belong below the route layer.
 
-Marketplace money values are stored as integer minor units plus a three-letter currency code. Proposal versions are append-only through the API. Search updates are written to the PostgreSQL outbox in the same transaction as the source change and indexed asynchronously.
+Marketplace money values are stored as integer minor units plus a three-letter currency code. Proposal versions and contract versions are immutable historical records. Search updates are written to the PostgreSQL outbox in the same transaction as the source change and indexed asynchronously.
 
-See `docs/adr/` for recorded architectural decisions and `docs/openapi.yaml` for the API contract.
+See `docs/adr/` for recorded architectural decisions. `docs/openapi.yaml` is the Marketplace Core API contract, and `docs/openapi/contracts.yaml` documents the Contract-phase endpoints added after it.
