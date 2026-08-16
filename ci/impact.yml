@@ -9,7 +9,7 @@ domains:
       - pyproject.toml
     unit:
       - tests/unit
-    flags: [python, database, redis]
+    flags: [python, database, redis, search]
   identity:
     paths:
       - app/identity/**
@@ -28,6 +28,70 @@ domains:
     integration:
       - tests/integration/test_database.py
     flags: [python, database]
+  freelancers:
+    paths:
+      - app/freelancers/**
+      - tests/unit/freelancers/**
+    unit:
+      - tests/unit/freelancers
+    integration:
+      - tests/integration/test_database.py
+    flags: [python, database, search]
+  portfolios:
+    paths:
+      - app/portfolios/**
+      - tests/unit/portfolios/**
+    unit:
+      - tests/unit/portfolios
+    integration:
+      - tests/integration/test_database.py
+    flags: [python, database, search]
+  gigs:
+    paths:
+      - app/gigs/**
+      - tests/unit/gigs/**
+    unit:
+      - tests/unit/gigs
+    integration:
+      - tests/integration/test_database.py
+    flags: [python, database]
+  projects:
+    paths:
+      - app/projects/**
+      - tests/unit/projects/**
+    unit:
+      - tests/unit/projects
+    integration:
+      - tests/integration/test_database.py
+    flags: [python, database, search]
+  proposals:
+    paths:
+      - app/proposals/**
+      - tests/unit/proposals/**
+    unit:
+      - tests/unit/proposals
+    integration:
+      - tests/integration/test_database.py
+    flags: [python, database, search]
+  reviews:
+    paths:
+      - app/reviews/**
+      - tests/unit/reviews/**
+    unit:
+      - tests/unit/reviews
+    integration:
+      - tests/integration/test_database.py
+    flags: [python, database, search]
+  search:
+    paths:
+      - app/search/**
+      - tests/unit/search/**
+      - tests/integration/test_search.py
+    unit:
+      - tests/unit/search
+    integration:
+      - tests/integration/test_search.py
+    flags: [python, search]
   database:
     paths:
       - migrations/**

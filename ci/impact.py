@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 
 CONFIG_PATH = Path(__file__).with_name("impact.yml")
-ALL_FLAGS = ("python", "database", "redis", "ci", "docker", "docs")
+ALL_FLAGS = ("python", "database", "redis", "search", "ci", "docker", "docs")
 
 
 def load_config() -> dict[str, Any]:
@@ -50,6 +50,7 @@ def calculate(changed_paths: list[str], config: dict[str, Any]) -> dict[str, Any
         flags["python"] = True
         flags["database"] = True
         flags["redis"] = True
+        flags["search"] = True
         unit_targets.add("tests/unit")
         integration_targets.add("tests/integration")
         domains.append("fallback-full-core")

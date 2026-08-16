@@ -35,9 +35,23 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "false"
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports: ["9200:9200"]
+        options: >-
+          --health-cmd "curl -fs http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
     env:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/freelancing
       REDIS_URL: redis://localhost:6379/15
+      ELASTICSEARCH_URL: http://localhost:9200
+      ELASTICSEARCH_INDEX_PREFIX: freelancing-main-${{ github.run_id }}
       SECRET_KEY: ci-only-secret
       APP_ENV: test
     steps:
@@ -48,11 +62,12 @@ jobs:
           cache: pip
       - run: python -m pip install --disable-pip-version-check -e '.[dev]'
       - run: ruff check app ci tests
+      - run: ruff format --check app ci tests
       - run: mypy app ci
       - run: pytest -m unit tests/unit
       - run: alembic upgrade head
       - run: alembic check
-      - run: pytest -m 'db or redis' tests/integration
+      - run: pytest -m 'db or redis or search' tests/integration
 
   image:
     needs: core

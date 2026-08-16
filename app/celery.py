@@ -22,8 +22,16 @@ def create_celery_app(app: Flask) -> Celery:
             "task_reject_on_worker_lost": True,
             "worker_prefetch_multiplier": 1,
             "task_default_queue": "default",
+            "beat_schedule": {
+                "drain-search-outbox": {
+                    "task": "search.drain_outbox",
+                    "schedule": 5.0,
+                    "args": (100,),
+                }
+            },
         }
     )
+    celery_app.autodiscover_tasks(["app.search"])
     celery_app.set_default()
     app.extensions["celery"] = celery_app
     return celery_app
