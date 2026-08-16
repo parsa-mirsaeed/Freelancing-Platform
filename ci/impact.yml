@@ -1,7 +1,14 @@
 domains:
-  shared:
+  bootstrap:
     paths:
       - app/__init__.py
+    unit:
+      - tests/unit
+    integration:
+      - tests/integration/test_database.py
+    flags: [python, database]
+  shared:
+    paths:
       - app/config.py
       - app/extensions.py
       - app/errors.py
@@ -73,6 +80,25 @@ domains:
     integration:
       - tests/integration/test_database.py
     flags: [python, database, search]
+  contracts:
+    paths:
+      - app/contracts/**
+      - tests/unit/contracts/**
+      - tests/integration/test_contracts.py
+    unit:
+      - tests/unit/contracts
+    integration:
+      - tests/integration/test_contracts.py
+    flags: [python, database]
+  milestones:
+    paths:
+      - app/milestones/**
+      - tests/unit/milestones/**
+    unit:
+      - tests/unit/milestones
+    integration:
+      - tests/integration/test_contracts.py
+    flags: [python, database]
   reviews:
     paths:
       - app/reviews/**
