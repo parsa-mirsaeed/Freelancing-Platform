@@ -16,12 +16,12 @@ def test_identity_change_selects_only_identity_core() -> None:
     assert result["unit_targets"] == ["tests/unit/identity"]
 
 
-def test_bootstrap_change_uses_focused_app_smoke_without_redis_or_search() -> None:
+def test_bootstrap_change_uses_focused_app_smoke_without_search() -> None:
     result = calculate(["app/__init__.py"], load_config())
     assert result["domains"] == ["bootstrap"]
     assert result["flags"]["database"] is True
-    assert result["flags"]["redis"] is False
     assert result["flags"]["search"] is False
+    assert result["flags"]["realtime"] is True
     assert result["unit_targets"] == ["tests/unit/test_app.py"]
     assert result["integration_targets"] == ["tests/integration/test_database.py"]
 
@@ -56,6 +56,36 @@ def test_ledger_change_selects_money_invariants_without_external_services() -> N
     assert result["integration_targets"] == ["tests/integration/test_money.py"]
 
 
+def test_messaging_change_selects_postgres_and_realtime_only() -> None:
+    result = calculate(["app/messaging/service.py"], load_config())
+    assert result["domains"] == ["messaging"]
+    assert result["flags"]["database"] is True
+    assert result["flags"]["realtime"] is True
+    assert result["flags"]["files"] is False
+    assert result["flags"]["search"] is False
+    assert result["unit_targets"] == ["tests/unit/messaging"]
+    assert result["integration_targets"] == ["tests/integration/test_communication.py"]
+
+
+def test_realtime_change_selects_redis_socket_without_postgres_job() -> None:
+    result = calculate(["app/realtime/socket.py"], load_config())
+    assert result["domains"] == ["realtime"]
+    assert result["flags"]["realtime"] is True
+    assert result["flags"]["database"] is False
+    assert result["flags"]["files"] is False
+    assert result["unit_targets"] == ["tests/unit/realtime"]
+
+
+def test_file_change_selects_minio_and_postgres_without_search() -> None:
+    result = calculate(["app/files/service.py"], load_config())
+    assert result["domains"] == ["files"]
+    assert result["flags"]["database"] is True
+    assert result["flags"]["files"] is True
+    assert result["flags"]["realtime"] is False
+    assert result["flags"]["search"] is False
+    assert result["unit_targets"] == ["tests/unit/files"]
+
+
 def test_freelancer_change_selects_search_projection() -> None:
     result = calculate(["app/freelancers/service.py"], load_config())
     assert result["domains"] == ["freelancers"]
@@ -78,6 +108,8 @@ def test_shared_change_runs_full_unit_and_core_services() -> None:
     assert result["unit_targets"] == ["tests/unit"]
     assert result["flags"]["redis"] is True
     assert result["flags"]["search"] is True
+    assert result["flags"]["realtime"] is True
+    assert result["flags"]["files"] is True
 
 
 def test_unknown_change_falls_back_to_full_core() -> None:
@@ -86,6 +118,8 @@ def test_unknown_change_falls_back_to_full_core() -> None:
     assert result["unit_targets"] == ["tests/unit"]
     assert result["integration_targets"] == ["tests/integration"]
     assert result["flags"]["search"] is True
+    assert result["flags"]["realtime"] is True
+    assert result["flags"]["files"] is True
 
 
 def test_github_output_is_shell_safe(tmp_path: Path) -> None:
@@ -96,4 +130,6 @@ def test_github_output_is_shell_safe(tmp_path: Path) -> None:
     assert "docs=true" in text
     assert "python=false" in text
     assert "search=false" in text
+    assert "realtime=false" in text
+    assert "files=false" in text
     assert "integration_targets=" in text

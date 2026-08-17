@@ -1,8 +1,11 @@
+import uuid
+
 import pytest
 from sqlalchemy import select
 
 from app.common.models import OutboxEvent
 from app.extensions import db
+from app.milestones.models import Milestone
 from tests.helpers import auth_header, register_user
 
 pytestmark = pytest.mark.unit
@@ -63,6 +66,12 @@ def test_review_requires_completed_contract_backed_project(
             json={"document_hash": document_hash},
         )
         assert signed.status_code == 200
+
+    milestone_id = uuid.UUID(contract["version"]["milestones"][0]["id"])
+    milestone = db.session.get(Milestone, milestone_id)
+    assert milestone is not None
+    milestone.status = "RELEASED"
+    db.session.commit()
 
     assert (
         client.post(

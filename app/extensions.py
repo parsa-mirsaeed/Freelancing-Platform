@@ -4,6 +4,7 @@ from typing import cast
 
 from elasticsearch import Elasticsearch
 from flask import Flask, current_app
+from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from redis import Redis
 from sqlalchemy import MetaData
@@ -23,6 +24,7 @@ class Base(DeclarativeBase):
 
 
 db = SQLAlchemy(model_class=Base)
+socketio = SocketIO()
 
 
 class RedisExtension:

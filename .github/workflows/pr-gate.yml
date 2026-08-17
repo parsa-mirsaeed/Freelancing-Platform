@@ -20,6 +20,8 @@ jobs:
       database: ${{ steps.impact.outputs.database }}
       redis: ${{ steps.impact.outputs.redis }}
       search: ${{ steps.impact.outputs.search }}
+      realtime: ${{ steps.impact.outputs.realtime }}
+      files: ${{ steps.impact.outputs.files }}
       ci: ${{ steps.impact.outputs.ci }}
       docker: ${{ steps.impact.outputs.docker }}
       docs: ${{ steps.impact.outputs.docs }}
@@ -151,6 +153,67 @@ jobs:
       - run: python -m pip install --disable-pip-version-check -e '.[dev]'
       - run: pytest -m redis tests/integration/test_redis.py
 
+  realtime:
+    name: Realtime Redis + Socket.IO integration
+    needs: changes
+    if: needs.changes.outputs.realtime == 'true'
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      REDIS_URL: redis://localhost:6379/14
+      SECRET_KEY: ci-only-secret
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: pytest -m socket tests/integration/test_realtime.py
+
+  files:
+    name: MinIO file integration
+    needs: changes
+    if: needs.changes.outputs.files == 'true'
+    runs-on: ubuntu-latest
+    env:
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: freelancing-ci-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Start MinIO
+        run: >-
+          docker run -d --rm --name minio-ci
+          -p 9000:9000
+          -e MINIO_ROOT_USER=minioadmin
+          -e MINIO_ROOT_PASSWORD=minioadmin
+          minio/minio:latest server /data
+      - name: Wait for MinIO
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fs http://localhost:9000/minio/health/live; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: pytest -m files tests/integration/test_files.py
+
   search:
     name: Elasticsearch integration
     needs: changes
@@ -216,7 +279,18 @@ jobs:
   gate:
     name: gate
     if: always()
-    needs: [changes, metadata, quality, unit, database, redis, search, docs, image]
+    needs:
+      - changes
+      - metadata
+      - quality
+      - unit
+      - database
+      - redis
+      - realtime
+      - files
+      - search
+      - docs
+      - image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -229,6 +303,8 @@ jobs:
           unit=${{ needs.unit.result }}
           database=${{ needs.database.result }}
           redis=${{ needs.redis.result }}
+          realtime=${{ needs.realtime.result }}
+          files=${{ needs.files.result }}
           search=${{ needs.search.result }}
           docs=${{ needs.docs.result }}
           image=${{ needs.image.result }}
