@@ -8,7 +8,7 @@ domains:
       - tests/unit/test_app.py
     integration:
       - tests/integration/test_database.py
-    flags: [python, database]
+    flags: [python, database, realtime]
   shared:
     paths:
       - app/config.py
@@ -18,7 +18,7 @@ domains:
       - pyproject.toml
     unit:
       - tests/unit
-    flags: [python, database, redis, search]
+    flags: [python, database, redis, search, realtime, files]
   identity:
     paths:
       - app/identity/**
@@ -131,6 +131,43 @@ domains:
     integration:
       - tests/integration/test_money.py
     flags: [python, database]
+  messaging:
+    paths:
+      - app/messaging/**
+      - tests/unit/messaging/**
+      - tests/integration/test_communication.py
+    unit:
+      - tests/unit/messaging
+    integration:
+      - tests/integration/test_communication.py
+    flags: [python, database, realtime]
+  realtime:
+    paths:
+      - app/realtime/**
+      - tests/unit/realtime/**
+      - tests/integration/test_realtime.py
+    unit:
+      - tests/unit/realtime
+    flags: [python, realtime]
+  notifications:
+    paths:
+      - app/notifications/**
+      - tests/unit/notifications/**
+    unit:
+      - tests/unit/notifications
+    integration:
+      - tests/integration/test_communication.py
+    flags: [python, database]
+  files:
+    paths:
+      - app/files/**
+      - tests/unit/files/**
+      - tests/integration/test_files.py
+    unit:
+      - tests/unit/files
+    integration:
+      - tests/integration/test_communication.py
+    flags: [python, database, files]
   reviews:
     paths:
       - app/reviews/**
@@ -156,7 +193,9 @@ domains:
       - alembic.ini
     integration:
       - tests/integration/test_database.py
+      - tests/integration/test_contracts.py
       - tests/integration/test_money.py
+      - tests/integration/test_communication.py
     flags: [python, database]
   ci:
     paths:

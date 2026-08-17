@@ -6,6 +6,10 @@
 /app/payments/ @parsa-mirsaeed
 /app/ledger/ @parsa-mirsaeed
 /app/payouts/ @parsa-mirsaeed
+/app/messaging/ @parsa-mirsaeed
+/app/realtime/ @parsa-mirsaeed
+/app/notifications/ @parsa-mirsaeed
+/app/files/ @parsa-mirsaeed
 /migrations/ @parsa-mirsaeed
 /.github/ @parsa-mirsaeed
 /infra/ @parsa-mirsaeed

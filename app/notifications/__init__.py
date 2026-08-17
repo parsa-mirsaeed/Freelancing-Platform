@@ -1,0 +1,1 @@
+"""Notification fan-out domain."""

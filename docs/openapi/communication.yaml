@@ -1,0 +1,169 @@
+openapi: 3.1.0
+info:
+  title: Freelancing Platform Communication API
+  version: 0.4.0
+  description: Communication-phase REST contract. Socket events are documented in the ADR.
+servers:
+  - url: /api/v1
+paths:
+  /contracts/{contract_id}/conversation:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Get or create the conversation for a contract party
+      parameters:
+        - name: contract_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: Conversation}
+        '403': {description: Not a contract party}
+        '404': {description: Contract not found}
+  /conversations:
+    get:
+      security: [{bearerAuth: []}]
+      summary: List conversations for the authenticated member
+      responses:
+        '200': {description: Conversation list}
+  /conversations/{conversation_id}/messages:
+    get:
+      security: [{bearerAuth: []}]
+      summary: Fetch ordered messages after a sequence cursor
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+        - name: after
+          in: query
+          schema: {type: integer, minimum: 0, default: 0}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200': {description: Ordered messages}
+    post:
+      security: [{bearerAuth: []}]
+      summary: Persist an idempotent message before realtime broadcast
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_message_id]
+              properties:
+                client_message_id: {type: string, minLength: 1, maxLength: 80}
+                body: {type: string, maxLength: 8000}
+                attachment_ids:
+                  type: array
+                  maxItems: 10
+                  uniqueItems: true
+                  items: {type: string, format: uuid}
+      responses:
+        '201': {description: Persisted message}
+        '403': {description: Not a conversation member}
+        '409': {description: Conflicting client message id or unsafe attachment}
+  /conversations/{conversation_id}/delivered:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Mark messages delivered through a sequence
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [through_sequence]
+              properties:
+                through_sequence: {type: integer, minimum: 0}
+      responses:
+        '200': {description: Delivery receipts recorded}
+  /conversations/{conversation_id}/read:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Mark messages read through a sequence
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [through_sequence]
+              properties:
+                through_sequence: {type: integer, minimum: 0}
+      responses:
+        '200': {description: Read cursor updated}
+  /files/uploads:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Reserve a quarantined object and obtain a presigned upload URL
+      responses:
+        '201': {description: File reservation and upload URL}
+  /files/{file_id}/complete:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Verify upload metadata and enqueue scanning
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: File is scanning, safe, or rejected}
+  /files/{file_id}:
+    get:
+      security: [{bearerAuth: []}]
+      summary: Authorize and issue a short-lived download URL for a SAFE file
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: Presigned download URL}
+        '409': {description: File is not SAFE}
+  /notifications:
+    get:
+      security: [{bearerAuth: []}]
+      summary: List in-app notifications
+      responses:
+        '200': {description: Notification list}
+  /notifications/{notification_id}/read:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Mark one notification read
+      responses:
+        '200': {description: Notification}
+  /notifications/preferences:
+    get:
+      security: [{bearerAuth: []}]
+      summary: List notification preferences
+      responses:
+        '200': {description: Preferences}
+    put:
+      security: [{bearerAuth: []}]
+      summary: Set one event/channel preference
+      responses:
+        '200': {description: Preference}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

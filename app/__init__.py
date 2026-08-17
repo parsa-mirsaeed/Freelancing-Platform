@@ -10,17 +10,21 @@ from app.config import Settings
 from app.contracts.api import contracts_bp
 from app.errors import register_error_handlers
 from app.extensions import db, elasticsearch_extension, redis_extension
+from app.files.api import files_bp
 from app.freelancers.api import freelancers_bp
 from app.gigs.api import gigs_bp
 from app.health import health_bp
 from app.identity.api import identity_bp
 from app.ledger.api import ledger_bp
+from app.messaging.api import messaging_bp
 from app.milestones.api import milestones_bp
+from app.notifications.api import notifications_bp
 from app.payments.api import payments_bp
 from app.payouts.api import payouts_bp
 from app.portfolios.api import portfolios_bp
 from app.projects.api import projects_bp
 from app.proposals.api import proposals_bp
+from app.realtime.service import init_realtime
 from app.reviews.api import reviews_bp
 from app.search.api import search_bp
 
@@ -35,6 +39,7 @@ def create_app(config_overrides: Mapping[str, Any] | None = None) -> Flask:
     redis_extension.init_app(app)
     elasticsearch_extension.init_app(app)
     _register_models()
+    init_realtime(app)
     app.register_blueprint(health_bp)
     app.register_blueprint(identity_bp)
     app.register_blueprint(freelancers_bp)
@@ -49,6 +54,9 @@ def create_app(config_overrides: Mapping[str, Any] | None = None) -> Flask:
     app.register_blueprint(payouts_bp)
     app.register_blueprint(reviews_bp)
     app.register_blueprint(search_bp)
+    app.register_blueprint(files_bp)
+    app.register_blueprint(messaging_bp)
+    app.register_blueprint(notifications_bp)
     register_error_handlers(app)
     _register_request_context(app)
     return app
@@ -58,11 +66,14 @@ def _register_models() -> None:
     from app.audit import models as audit_models  # noqa: F401
     from app.common import models as common_models  # noqa: F401
     from app.contracts import models as contract_models  # noqa: F401
+    from app.files import models as file_models  # noqa: F401
     from app.freelancers import models as freelancer_models  # noqa: F401
     from app.gigs import models as gig_models  # noqa: F401
     from app.identity import models as identity_models  # noqa: F401
     from app.ledger import models as ledger_models  # noqa: F401
+    from app.messaging import models as messaging_models  # noqa: F401
     from app.milestones import models as milestone_models  # noqa: F401
+    from app.notifications import models as notification_models  # noqa: F401
     from app.payments import models as payment_models  # noqa: F401
     from app.payouts import models as payout_models  # noqa: F401
     from app.portfolios import models as portfolio_models  # noqa: F401
