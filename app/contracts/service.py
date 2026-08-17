@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import uuid
 from datetime import UTC, datetime
 
@@ -19,7 +20,7 @@ from app.milestones.models import Milestone
 from app.projects.models import Project, ProjectAttachment
 from app.proposals.models import Proposal, ProposalVersion
 
-SNAPSHOT_SCHEMA_VERSION = 1
+SNAPSHOT_SCHEMA_VERSION = 2
 
 
 def get_contract(contract_id: uuid.UUID) -> Contract:
@@ -69,6 +70,7 @@ def create_contract_from_accepted_proposal(
         )
 
     proposal_version = _current_proposal_version(proposal)
+    milestone_terms = _milestone_terms(proposal_version)
     attachments = list(
         db.session.scalars(
             select(ProjectAttachment)
@@ -80,6 +82,7 @@ def create_contract_from_accepted_proposal(
         project=project,
         proposal=proposal,
         proposal_version=proposal_version,
+        milestone_terms=milestone_terms,
         attachments=attachments,
     )
     version = ContractVersion(
@@ -112,14 +115,14 @@ def create_contract_from_accepted_proposal(
     )
     version.milestones.extend(
         Milestone(
-            sequence=milestone.sequence,
-            title=milestone.title,
-            amount_minor=milestone.amount_minor,
+            sequence=sequence,
+            title=title,
+            amount_minor=amount_minor,
             currency=proposal_version.currency,
-            delivery_days=milestone.delivery_days,
+            delivery_days=delivery_days,
             status="CREATED",
         )
-        for milestone in proposal_version.milestones
+        for sequence, title, amount_minor, delivery_days in milestone_terms
     )
     db.session.add(contract)
     db.session.flush()
@@ -262,6 +265,24 @@ def cancel_contract(*, user: User, contract_id: uuid.UUID) -> Contract:
                 409,
                 "An active contract cannot be cancelled after milestone work starts",
             )
+        from app.payments.models import PaymentIntent
+
+        milestone_ids = [milestone.id for milestone in version.milestones]
+        pending_payment = None
+        if milestone_ids:
+            pending_payment = db.session.scalar(
+                select(PaymentIntent.id).where(
+                    PaymentIntent.milestone_id.in_(milestone_ids),
+                    PaymentIntent.status == "PENDING",
+                )
+            )
+        if pending_payment is not None:
+            raise ApiError(
+                "invalid_state",
+                "Contract has pending funding",
+                409,
+                "An active contract cannot be cancelled while a funding payment is pending",
+            )
 
     contract.status = "CANCELLED"
     contract.cancelled_at = datetime.now(UTC)
@@ -308,11 +329,28 @@ def _current_contract_version(contract: Contract) -> ContractVersion:
     raise RuntimeError("Contract current_version does not reference a loaded version")
 
 
+def _milestone_terms(proposal_version: ProposalVersion) -> list[tuple[int, str, int, int]]:
+    if proposal_version.milestones:
+        return [
+            (
+                milestone.sequence,
+                milestone.title,
+                milestone.amount_minor,
+                milestone.delivery_days,
+            )
+            for milestone in proposal_version.milestones
+        ]
+    return [
+        (1, "Full contract delivery", proposal_version.amount_minor, proposal_version.delivery_days)
+    ]
+
+
 def _build_snapshot(
     *,
     project: Project,
     proposal: Proposal,
     proposal_version: ProposalVersion,
+    milestone_terms: list[tuple[int, str, int, int]],
     attachments: list[ProjectAttachment],
 ) -> dict[str, object]:
     return {
@@ -333,15 +371,15 @@ def _build_snapshot(
         "delivery_days": proposal_version.delivery_days,
         "milestones": [
             {
-                "sequence": milestone.sequence,
-                "title": milestone.title,
-                "amount_minor": milestone.amount_minor,
+                "sequence": sequence,
+                "title": title,
+                "amount_minor": amount_minor,
                 "currency": proposal_version.currency,
-                "delivery_days": milestone.delivery_days,
+                "delivery_days": delivery_days,
             }
-            for milestone in proposal_version.milestones
+            for sequence, title, amount_minor, delivery_days in milestone_terms
         ],
-        "commission": None,
+        "commission": {"platform_bps": _commission_bps()},
         "refund_terms": None,
         "dispute_terms": None,
         "attachments": [
@@ -362,3 +400,14 @@ def _document_hash(snapshot: dict[str, object]) -> str:
         snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _commission_bps() -> int:
+    raw = os.getenv("PLATFORM_COMMISSION_BPS", "1000")
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError("PLATFORM_COMMISSION_BPS must be an integer") from exc
+    if value < 0 or value > 10000:
+        raise RuntimeError("PLATFORM_COMMISSION_BPS must be between 0 and 10000")
+    return value

@@ -5,6 +5,7 @@
 /app/milestones/ @parsa-mirsaeed
 /app/payments/ @parsa-mirsaeed
 /app/ledger/ @parsa-mirsaeed
+/app/payouts/ @parsa-mirsaeed
 /migrations/ @parsa-mirsaeed
 /.github/ @parsa-mirsaeed
 /infra/ @parsa-mirsaeed

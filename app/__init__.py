@@ -14,7 +14,10 @@ from app.freelancers.api import freelancers_bp
 from app.gigs.api import gigs_bp
 from app.health import health_bp
 from app.identity.api import identity_bp
+from app.ledger.api import ledger_bp
 from app.milestones.api import milestones_bp
+from app.payments.api import payments_bp
+from app.payouts.api import payouts_bp
 from app.portfolios.api import portfolios_bp
 from app.projects.api import projects_bp
 from app.proposals.api import proposals_bp
@@ -41,6 +44,9 @@ def create_app(config_overrides: Mapping[str, Any] | None = None) -> Flask:
     app.register_blueprint(proposals_bp)
     app.register_blueprint(contracts_bp)
     app.register_blueprint(milestones_bp)
+    app.register_blueprint(payments_bp)
+    app.register_blueprint(ledger_bp)
+    app.register_blueprint(payouts_bp)
     app.register_blueprint(reviews_bp)
     app.register_blueprint(search_bp)
     register_error_handlers(app)
@@ -55,7 +61,10 @@ def _register_models() -> None:
     from app.freelancers import models as freelancer_models  # noqa: F401
     from app.gigs import models as gig_models  # noqa: F401
     from app.identity import models as identity_models  # noqa: F401
+    from app.ledger import models as ledger_models  # noqa: F401
     from app.milestones import models as milestone_models  # noqa: F401
+    from app.payments import models as payment_models  # noqa: F401
+    from app.payouts import models as payout_models  # noqa: F401
     from app.portfolios import models as portfolio_models  # noqa: F401
     from app.projects import models as project_models  # noqa: F401
     from app.proposals import models as proposal_models  # noqa: F401

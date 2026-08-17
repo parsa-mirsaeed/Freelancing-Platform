@@ -1,0 +1,93 @@
+openapi: 3.1.0
+info:
+  title: Freelancing Platform Money API
+  version: 0.4.0
+paths:
+  /api/v1/milestones/{milestone_id}/financials:
+    get:
+      summary: Read ledger-derived milestone escrow state
+      parameters:
+        - $ref: '#/components/parameters/MilestoneId'
+      responses:
+        '200':
+          description: Financial state
+  /api/v1/milestones/{milestone_id}/fund:
+    post:
+      summary: Create an idempotent provider payment for milestone funding
+      parameters:
+        - $ref: '#/components/parameters/MilestoneId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Payment pending provider capture or idempotent replay of the original request
+  /api/v1/milestones/{milestone_id}/release:
+    post:
+      summary: Release approved milestone escrow to wallet and platform commission
+      parameters:
+        - $ref: '#/components/parameters/MilestoneId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Milestone released or idempotent replay
+  /api/v1/milestones/{milestone_id}/refund:
+    post:
+      summary: Fully refund a funded milestone before work starts
+      parameters:
+        - $ref: '#/components/parameters/MilestoneId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Refund succeeded or idempotent replay
+        '502':
+          description: Provider refund failed and ledger reservation was reversed
+  /api/v1/payments/webhooks/{provider}:
+    post:
+      summary: Receive a signed provider webhook
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event processed, ignored safely, or duplicate
+        '401':
+          description: Signature verification failed
+        '409':
+          description: Event identity or commercial terms conflict
+  /api/v1/wallet:
+    get:
+      summary: Read freelancer balances derived from ledger entries
+      responses:
+        '200':
+          description: Currency balances
+  /api/v1/payouts:
+    post:
+      summary: Create an idempotent payout from available wallet funds
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Payout succeeded or idempotent replay
+        '409':
+          description: Insufficient wallet balance
+        '502':
+          description: Provider payout failed and reservation was reversed
+components:
+  parameters:
+    MilestoneId:
+      name: milestone_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
