@@ -16,13 +16,13 @@ def test_identity_change_selects_only_identity_core() -> None:
     assert result["unit_targets"] == ["tests/unit/identity"]
 
 
-def test_bootstrap_change_uses_core_database_without_redis_or_search() -> None:
+def test_bootstrap_change_uses_focused_app_smoke_without_redis_or_search() -> None:
     result = calculate(["app/__init__.py"], load_config())
     assert result["domains"] == ["bootstrap"]
     assert result["flags"]["database"] is True
     assert result["flags"]["redis"] is False
     assert result["flags"]["search"] is False
-    assert result["unit_targets"] == ["tests/unit"]
+    assert result["unit_targets"] == ["tests/unit/test_app.py"]
     assert result["integration_targets"] == ["tests/integration/test_database.py"]
 
 
@@ -34,6 +34,26 @@ def test_contract_change_selects_contract_unit_and_database_integration() -> Non
     assert result["flags"]["search"] is False
     assert result["unit_targets"] == ["tests/unit/contracts"]
     assert result["integration_targets"] == ["tests/integration/test_contracts.py"]
+
+
+def test_money_change_selects_only_money_unit_and_postgres_integration() -> None:
+    result = calculate(["app/payments/service.py"], load_config())
+    assert result["domains"] == ["payments"]
+    assert result["flags"]["database"] is True
+    assert result["flags"]["redis"] is False
+    assert result["flags"]["search"] is False
+    assert result["unit_targets"] == ["tests/unit/payments"]
+    assert result["integration_targets"] == ["tests/integration/test_money.py"]
+
+
+def test_ledger_change_selects_money_invariants_without_external_services() -> None:
+    result = calculate(["app/ledger/service.py"], load_config())
+    assert result["domains"] == ["ledger"]
+    assert result["flags"]["database"] is True
+    assert result["flags"]["redis"] is False
+    assert result["flags"]["search"] is False
+    assert result["unit_targets"] == ["tests/unit/ledger"]
+    assert result["integration_targets"] == ["tests/integration/test_money.py"]
 
 
 def test_freelancer_change_selects_search_projection() -> None:

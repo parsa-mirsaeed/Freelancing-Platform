@@ -2,8 +2,10 @@ domains:
   bootstrap:
     paths:
       - app/__init__.py
+      - app/celery.py
+      - app/celery_worker.py
     unit:
-      - tests/unit
+      - tests/unit/test_app.py
     integration:
       - tests/integration/test_database.py
     flags: [python, database]
@@ -70,6 +72,7 @@ domains:
       - tests/unit/projects
     integration:
       - tests/integration/test_database.py
+      - tests/integration/test_money.py
     flags: [python, database, search]
   proposals:
     paths:
@@ -98,6 +101,35 @@ domains:
       - tests/unit/milestones
     integration:
       - tests/integration/test_contracts.py
+      - tests/integration/test_money.py
+    flags: [python, database]
+  payments:
+    paths:
+      - app/payments/**
+      - tests/unit/payments/**
+      - tests/integration/test_money.py
+    unit:
+      - tests/unit/payments
+    integration:
+      - tests/integration/test_money.py
+    flags: [python, database]
+  ledger:
+    paths:
+      - app/ledger/**
+      - tests/unit/ledger/**
+    unit:
+      - tests/unit/ledger
+    integration:
+      - tests/integration/test_money.py
+    flags: [python, database]
+  payouts:
+    paths:
+      - app/payouts/**
+      - tests/unit/payouts/**
+    unit:
+      - tests/unit/payments
+    integration:
+      - tests/integration/test_money.py
     flags: [python, database]
   reviews:
     paths:
@@ -124,11 +156,12 @@ domains:
       - alembic.ini
     integration:
       - tests/integration/test_database.py
+      - tests/integration/test_money.py
     flags: [python, database]
   ci:
     paths:
       - ci/**
-      - .github/workflows/**
+      - .github/**
     flags: [ci]
   docker:
     paths:

@@ -31,7 +31,7 @@ def create_celery_app(app: Flask) -> Celery:
             },
         }
     )
-    celery_app.autodiscover_tasks(["app.search"])
+    celery_app.autodiscover_tasks(["app.search", "app.payments"])
     celery_app.set_default()
     app.extensions["celery"] = celery_app
     return celery_app

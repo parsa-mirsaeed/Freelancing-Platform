@@ -120,6 +120,10 @@ def _transition(
             409,
             f"{milestone.status} cannot transition to {target}",
         )
+    if action == "start":
+        from app.payments.service import require_milestone_fully_funded
+
+        require_milestone_fully_funded(milestone)
 
     previous = milestone.status
     milestone.status = target

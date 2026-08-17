@@ -8,11 +8,8 @@ from sqlalchemy.orm import selectinload
 from app.audit.service import record_audit_event
 from app.errors import ApiError
 from app.extensions import db
-from app.freelancers.service import (
-    get_or_create_skill,
-    get_profile_by_user_id,
-    touch_search_projection,
-)
+from app.freelancers.models import FreelancerProfile
+from app.freelancers.service import get_or_create_skill, touch_search_projection
 from app.identity.models import User
 from app.projects.models import Project, ProjectSkill
 from app.projects.policies import can_edit_project
@@ -143,7 +140,7 @@ def close_project(*, user: User, project_id: uuid.UUID) -> Project:
     incomplete = db.session.scalar(
         select(Milestone.id).where(
             Milestone.contract_version_id == current_version_id,
-            Milestone.status.not_in({"APPROVED", "RELEASE_PENDING", "RELEASED"}),
+            Milestone.status != "RELEASED",
         )
     )
     if incomplete is not None:
@@ -151,11 +148,14 @@ def close_project(*, user: User, project_id: uuid.UUID) -> Project:
             "invalid_state",
             "Project cannot close",
             409,
-            "All contract milestones must be approved before the project can close",
+            "All current contract milestones must be released before the project can close",
         )
     project.status = "CLOSED"
-    profile = get_profile_by_user_id(contract.freelancer_user_id)
-    touch_search_projection(profile)
+    profile = db.session.scalar(
+        select(FreelancerProfile).where(FreelancerProfile.user_id == contract.freelancer_user_id)
+    )
+    if profile is not None:
+        touch_search_projection(profile)
     record_audit_event(
         action="project.closed",
         resource_type="project",

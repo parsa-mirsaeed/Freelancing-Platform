@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import os
 import uuid
 
@@ -8,6 +11,8 @@ import pytest
 from app import create_app
 
 pytestmark = pytest.mark.db
+
+_WEBHOOK_SECRET = b"development-only-payment-webhook-secret"
 
 
 def _register(client, *, email: str, role: str):  # type: ignore[no-untyped-def]
@@ -37,6 +42,76 @@ def _app():  # type: ignore[no-untyped-def]
             "ELASTICSEARCH_URL": "http://localhost:9200",
             "ELASTICSEARCH_INDEX_PREFIX": "db-integration-unused",
         }
+    )
+
+
+def _fund_approve_and_release(
+    client, employer, freelancer, contract: dict[str, object], *, suffix: str
+) -> None:  # type: ignore[no-untyped-def]
+    version = contract["version"]
+    assert isinstance(version, dict)
+    milestones = version["milestones"]
+    assert isinstance(milestones, list) and len(milestones) == 1
+    milestone = milestones[0]
+    assert isinstance(milestone, dict)
+    milestone_id = milestone["id"]
+    assert isinstance(milestone_id, str)
+
+    created = client.post(
+        f"/api/v1/milestones/{milestone_id}/fund",
+        headers={**_headers(employer), "Idempotency-Key": f"{suffix}-fund"},
+        json={"provider": "sandbox"},
+    )
+    assert created.status_code == 202
+    intent = created.get_json()
+    payload = json.dumps(
+        {
+            "id": f"{suffix}-captured",
+            "type": "payment.captured",
+            "data": {
+                "reference": intent["provider_reference"],
+                "amount_minor": intent["amount_minor"],
+                "currency": intent["currency"],
+            },
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    signature = hmac.new(_WEBHOOK_SECRET, payload, hashlib.sha256).hexdigest()
+    assert (
+        client.post(
+            "/api/v1/payments/webhooks/sandbox",
+            data=payload,
+            headers={"X-Payment-Signature": signature, "Content-Type": "application/json"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/v1/milestones/{milestone_id}/start", headers=_headers(freelancer)
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/v1/milestones/{milestone_id}/submit",
+            headers=_headers(freelancer),
+            json={"note": "complete"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/v1/milestones/{milestone_id}/approve", headers=_headers(employer)
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/v1/milestones/{milestone_id}/release",
+            headers={**_headers(employer), "Idempotency-Key": f"{suffix}-release"},
+        ).status_code
+        == 200
     )
 
 
@@ -177,6 +252,9 @@ def test_marketplace_round_trip_on_postgres() -> None:
             contract = signed.get_json()
         assert contract["status"] == "ACTIVE"
 
+        _fund_approve_and_release(
+            client, employer, freelancer, contract, suffix=f"integration-{suffix}"
+        )
         assert (
             client.post(
                 f"/api/v1/projects/{project_id}/close", headers=employer_headers

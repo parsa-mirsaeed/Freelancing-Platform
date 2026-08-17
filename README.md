@@ -31,8 +31,21 @@ A skill-sharing and freelancing marketplace built as a domain-driven modular Fla
 - Employer and freelancer signatures are hash-bound and idempotency-key protected; the contract activates only after both required signatures exist.
 - Contract versions, signatures, and milestone progress events are append-only at the ORM layer and protected against direct mutation by PostgreSQL triggers.
 - Milestone execution progress supports freelancer start/submit/resubmit and employer request-changes/approve transitions with resource-level authorization and idempotent repeated transitions.
-- Project close and reviews are contract-backed: the contract must be active, and current-version milestones must be approved before close.
-- Financial milestone transitions are intentionally reserved for the Money phase: funding, release, ledger, commission, refund, and payout authority are not implemented here.
+
+### Money
+
+- Payment providers are behind a provider-neutral interface; the included sandbox adapter is deterministic and network-free for local development and CI.
+- Milestone funding is captured from signed, deduplicated provider webhooks and posts to an internal double-entry ledger.
+- Every committed journal is single-currency and balanced; PostgreSQL deferrable constraint triggers reject unbalanced journals.
+- Journal transactions and ledger entries are append-only in both the ORM and PostgreSQL. Corrections use reversal journals.
+- Escrow is derived from ledger entries. Full funding moves milestones to `FUNDED`; work cannot start until the contracted amount is present.
+- Employer release requires an approved milestone, locks financial state, posts freelancer wallet and platform commission credits, and moves the milestone to `RELEASED`.
+- Full pre-work refunds reverse escrow entitlement through the ledger and reset the milestone to `CREATED` only after provider success.
+- Wallet views are derived from ledger entries rather than a mutable user balance.
+- Payouts reserve wallet funds in a locked database transaction before the provider call and reverse the reservation on provider failure.
+- Financial mutations use scoped idempotency keys; provider events use provider/event-id deduplication and signature verification.
+- Reconciliation compares captured provider transactions against local payment and funding records and emits mismatch outbox events.
+- Project close now requires all current-version milestones to be financially released.
 
 ## Local development
 
@@ -59,6 +72,13 @@ export ELASTICSEARCH_URL='http://localhost:9200'
 export ELASTICSEARCH_INDEX_PREFIX='freelancing-development'
 export SECRET_KEY='replace-this-local-secret'
 alembic upgrade head
+```
+
+The default local Money adapter is `sandbox`. Override these only when needed:
+
+```bash
+export PAYMENT_WEBHOOK_SECRET='replace-this-local-webhook-secret'
+export PLATFORM_COMMISSION_BPS='1000'
 ```
 
 Run the API:
@@ -91,7 +111,7 @@ mypy app ci
 pytest -m unit tests/unit
 ```
 
-Integration tests require the corresponding real service. PR CI starts PostgreSQL, Redis, or Elasticsearch only when the impact detector selects that dependency. Contract and milestone changes select the focused PostgreSQL contract integration test in addition to any other affected database smoke tests.
+Integration tests require the corresponding real service. PR CI starts PostgreSQL, Redis, or Elasticsearch only when the impact detector selects that dependency. Payment, ledger, payout, milestone, or relevant project changes select the focused PostgreSQL Money invariant suite. Redis remains skipped for Money-only work, while Elasticsearch is selected only when a changed domain affects its projection.
 
 ## Architecture rules
 
@@ -99,6 +119,6 @@ PostgreSQL is the source of truth. Redis is ephemeral. Elasticsearch is a rebuil
 
 HTTP controllers stay thin: controller → application/domain service → repository/external adapter. Business-state transitions and authorization decisions belong below the route layer.
 
-Marketplace money values are stored as integer minor units plus a three-letter currency code. Proposal versions and contract versions are immutable historical records. Search updates are written to the PostgreSQL outbox in the same transaction as the source change and indexed asynchronously.
+Marketplace money values are stored as integer minor units plus a three-letter currency code. Proposal versions and contract versions are immutable historical records. Financial balances are derived from immutable double-entry ledger entries, and external provider state never replaces the internal ledger as the accounting authority. Search updates are written to the PostgreSQL outbox in the same transaction as the source change and indexed asynchronously.
 
-See `docs/adr/` for recorded architectural decisions. `docs/openapi.yaml` is the Marketplace Core API contract, and `docs/openapi/contracts.yaml` documents the Contract-phase endpoints added after it.
+See `docs/adr/` for recorded architectural decisions. `docs/openapi.yaml` is the Marketplace Core API contract, while phase-owned fragments under `docs/openapi/` document Contract and Money endpoints.

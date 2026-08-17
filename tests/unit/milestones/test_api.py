@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-import uuid
+import hashlib
+import hmac
+import json
 
 import pytest
 
-from app.extensions import db
-from app.milestones.models import Milestone
 from tests.helpers import auth_header, register_user
 
 pytestmark = pytest.mark.unit
+
+_WEBHOOK_SECRET = b"development-only-payment-webhook-secret"
 
 
 def _active_contract_with_milestone(client):  # type: ignore[no-untyped-def]
@@ -27,23 +29,32 @@ def _active_contract_with_milestone(client):  # type: ignore[no-untyped-def]
             "amount_minor": 9000,
             "currency": "USD",
             "delivery_days": 9,
-            "milestones": [{"title": "Delivery", "amount_minor": 9000, "delivery_days": 9}],
+            "milestones": [
+                {
+                    "title": "Delivery",
+                    "amount_minor": 9000,
+                    "delivery_days": 9,
+                }
+            ],
         },
     ).get_json()
     assert (
         client.post(
-            f"/api/v1/proposals/{proposal['id']}/submit", headers=auth_header(freelancer)
+            f"/api/v1/proposals/{proposal['id']}/submit",
+            headers=auth_header(freelancer),
         ).status_code
         == 200
     )
     assert (
         client.post(
-            f"/api/v1/proposals/{proposal['id']}/accept", headers=auth_header(employer)
+            f"/api/v1/proposals/{proposal['id']}/accept",
+            headers=auth_header(employer),
         ).status_code
         == 200
     )
     contract = client.get(
-        f"/api/v1/projects/{project['id']}/contract", headers=auth_header(employer)
+        f"/api/v1/projects/{project['id']}/contract",
+        headers=auth_header(employer),
     ).get_json()
     document_hash = contract["version"]["document_hash"]
     for key, user in (
@@ -61,25 +72,55 @@ def _active_contract_with_milestone(client):  # type: ignore[no-untyped-def]
     return employer, freelancer, intruder, contract
 
 
+def _fund(client, employer, milestone_id: str) -> None:  # type: ignore[no-untyped-def]
+    response = client.post(
+        f"/api/v1/milestones/{milestone_id}/fund",
+        headers={**auth_header(employer), "Idempotency-Key": "milestone-fund"},
+        json={"provider": "sandbox"},
+    )
+    assert response.status_code == 202
+    intent = response.get_json()
+    payload = json.dumps(
+        {
+            "id": "milestone-fund-captured",
+            "type": "payment.captured",
+            "data": {
+                "provider_reference": intent["provider_reference"],
+                "amount_minor": intent["amount_minor"],
+                "currency": intent["currency"],
+            },
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    signature = hmac.new(_WEBHOOK_SECRET, payload, hashlib.sha256).hexdigest()
+    webhook = client.post(
+        "/api/v1/payments/webhooks/sandbox",
+        data=payload,
+        headers={
+            "X-Payment-Signature": signature,
+            "Content-Type": "application/json",
+        },
+    )
+    assert webhook.status_code == 200
+
+
 def test_progress_state_machine_is_authorized_and_idempotent(
     client,  # type: ignore[no-untyped-def]
 ) -> None:
     employer, freelancer, intruder, contract = _active_contract_with_milestone(client)
     milestone_id = contract["version"]["milestones"][0]["id"]
-
-    milestone = db.session.get(Milestone, uuid.UUID(milestone_id))
-    assert milestone is not None
-    # Money owns CREATED -> FUNDED. This seeds that boundary so Contract progress can be tested now.
-    milestone.status = "FUNDED"
-    db.session.commit()
+    _fund(client, employer, milestone_id)
 
     forbidden = client.post(
-        f"/api/v1/milestones/{milestone_id}/start", headers=auth_header(intruder)
+        f"/api/v1/milestones/{milestone_id}/start",
+        headers=auth_header(intruder),
     )
     assert forbidden.status_code == 403
 
     started = client.post(
-        f"/api/v1/milestones/{milestone_id}/start", headers=auth_header(freelancer)
+        f"/api/v1/milestones/{milestone_id}/start",
+        headers=auth_header(freelancer),
     )
     assert started.status_code == 200
     assert started.get_json()["status"] == "IN_PROGRESS"
@@ -91,7 +132,7 @@ def test_progress_state_machine_is_authorized_and_idempotent(
     )
     assert submitted.status_code == 200
     assert submitted.get_json()["status"] == "SUBMITTED"
-    assert len(submitted.get_json()["events"]) == 2
+    assert len(submitted.get_json()["events"]) == 3
 
     repeated = client.post(
         f"/api/v1/milestones/{milestone_id}/submit",
@@ -99,7 +140,7 @@ def test_progress_state_machine_is_authorized_and_idempotent(
         json={"note": "duplicate request"},
     )
     assert repeated.status_code == 200
-    assert len(repeated.get_json()["events"]) == 2
+    assert len(repeated.get_json()["events"]) == 3
 
     changes = client.post(
         f"/api/v1/milestones/{milestone_id}/request-changes",
@@ -118,14 +159,16 @@ def test_progress_state_machine_is_authorized_and_idempotent(
     assert resubmitted.get_json()["status"] == "SUBMITTED"
 
     approved = client.post(
-        f"/api/v1/milestones/{milestone_id}/approve", headers=auth_header(employer)
+        f"/api/v1/milestones/{milestone_id}/approve",
+        headers=auth_header(employer),
     )
     assert approved.status_code == 200
     assert approved.get_json()["status"] == "APPROVED"
-    assert len(approved.get_json()["events"]) == 5
+    assert len(approved.get_json()["events"]) == 6
 
     repeated_approval = client.post(
-        f"/api/v1/milestones/{milestone_id}/approve", headers=auth_header(employer)
+        f"/api/v1/milestones/{milestone_id}/approve",
+        headers=auth_header(employer),
     )
     assert repeated_approval.status_code == 200
-    assert len(repeated_approval.get_json()["events"]) == 5
+    assert len(repeated_approval.get_json()["events"]) == 6
