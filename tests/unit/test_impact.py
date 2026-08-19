@@ -124,6 +124,26 @@ def test_shared_change_runs_full_unit_and_core_services() -> None:
     assert result["flags"]["files"] is True
 
 
+def test_frontend_change_runs_frontend_only_with_targeted_browser_smoke() -> None:
+    result = calculate(["frontend/src/app/page.tsx"], load_config())
+    assert result["domains"] == ["frontend"]
+    assert result["flags"]["frontend"] is True
+    assert result["flags"]["frontend_e2e"] is True
+    assert result["flags"]["python"] is False
+    assert result["flags"]["database"] is False
+    assert result["frontend_unit_targets"] == ["frontend/tests/unit"]
+    assert result["frontend_e2e_targets"] == ["frontend/tests/e2e/smoke.spec.ts"]
+
+
+def test_frontend_dependency_change_adds_audit_without_backend_services() -> None:
+    result = calculate(["frontend/package.json"], load_config())
+    assert result["domains"] == ["frontend", "frontend-dependencies"]
+    assert result["flags"]["frontend"] is True
+    assert result["flags"]["frontend_dependencies"] is True
+    assert result["flags"]["database"] is False
+    assert result["flags"]["search"] is False
+
+
 def test_kubernetes_change_runs_policy_validation_only() -> None:
     result = calculate(["infra/kubernetes/base.yaml"], load_config())
     assert result["domains"] == ["kubernetes"]
@@ -169,4 +189,8 @@ def test_github_output_is_shell_safe(tmp_path: Path) -> None:
     assert "files=false" in text
     assert "k8s=false" in text
     assert "dependencies=false" in text
+    assert "frontend=false" in text
+    assert "frontend_e2e=false" in text
+    assert "frontend_unit_targets=" in text
+    assert "frontend_e2e_targets=" in text
     assert "integration_targets=" in text

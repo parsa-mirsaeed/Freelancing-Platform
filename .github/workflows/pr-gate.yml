@@ -27,10 +27,15 @@ jobs:
       docs: ${{ steps.impact.outputs.docs }}
       k8s: ${{ steps.impact.outputs.k8s }}
       dependencies: ${{ steps.impact.outputs.dependencies }}
+      frontend: ${{ steps.impact.outputs.frontend }}
+      frontend_e2e: ${{ steps.impact.outputs.frontend_e2e }}
+      frontend_dependencies: ${{ steps.impact.outputs.frontend_dependencies }}
       unit_targets: ${{ steps.impact.outputs.unit_targets }}
       integration_targets: ${{ steps.impact.outputs.integration_targets }}
+      frontend_unit_targets: ${{ steps.impact.outputs.frontend_unit_targets }}
+      frontend_e2e_targets: ${{ steps.impact.outputs.frontend_e2e_targets }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v5
@@ -52,7 +57,7 @@ jobs:
     needs: changes
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -67,7 +72,7 @@ jobs:
     if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -83,7 +88,7 @@ jobs:
     if: needs.changes.outputs.python == 'true' && needs.changes.outputs.unit_targets != ''
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -116,7 +121,7 @@ jobs:
       SECRET_KEY: ci-only-secret
       APP_ENV: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -147,7 +152,7 @@ jobs:
       SECRET_KEY: ci-only-secret
       APP_ENV: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -175,7 +180,7 @@ jobs:
       SECRET_KEY: ci-only-secret
       APP_ENV: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -194,7 +199,7 @@ jobs:
       S3_SECRET_KEY: minioadmin
       S3_BUCKET: freelancing-ci-${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -241,7 +246,7 @@ jobs:
       SECRET_KEY: ci-only-secret
       APP_ENV: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -255,7 +260,7 @@ jobs:
     if: needs.changes.outputs.k8s == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -268,7 +273,7 @@ jobs:
     if: needs.changes.outputs.dependencies == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -276,13 +281,63 @@ jobs:
       - run: python -m pip install --disable-pip-version-check -e '.[dev]' pip-audit
       - run: pip-audit
 
+  frontend:
+    name: Frontend quality + build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      BACKEND_API_URL: http://127.0.0.1:8000
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: npm install --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Run selected frontend unit tests
+        if: needs.changes.outputs.frontend_unit_targets != ''
+        run: npx vitest run ${{ needs.changes.outputs.frontend_unit_targets }}
+      - run: npm run build
+      - name: Audit production dependencies
+        if: needs.changes.outputs.frontend_dependencies == 'true'
+        run: npm audit --omit=dev --audit-level=high
+
+  frontend_e2e:
+    name: Frontend Chromium smoke
+    needs: changes
+    if: needs.changes.outputs.frontend_e2e == 'true' && needs.changes.outputs.frontend_e2e_targets != ''
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      BACKEND_API_URL: http://127.0.0.1:8000
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Run selected browser flows
+        run: npx playwright test ${{ needs.changes.outputs.frontend_e2e_targets }}
+
   docs:
     name: Markdown formatting
     needs: changes
     if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -295,7 +350,7 @@ jobs:
     if: needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
@@ -320,11 +375,13 @@ jobs:
       - search
       - kubernetes
       - dependencies
+      - frontend
+      - frontend_e2e
       - docs
       - image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Verify required jobs
         run: >-
           python ci/verify_gate.py
@@ -339,5 +396,7 @@ jobs:
           search=${{ needs.search.result }}
           kubernetes=${{ needs.kubernetes.result }}
           dependencies=${{ needs.dependencies.result }}
+          frontend=${{ needs.frontend.result }}
+          frontend_e2e=${{ needs.frontend_e2e.result }}
           docs=${{ needs.docs.result }}
           image=${{ needs.image.result }}
