@@ -1,0 +1,46 @@
+openapi: 3.1.0
+info:
+  title: Freelancing Platform Calls API
+  version: 0.7.0
+paths:
+  /api/v1/calls/ice-servers:
+    get:
+      summary: Issue short-lived STUN/TURN configuration for the authenticated session
+      responses:
+        '200':
+          description: Browser-compatible ICE server configuration with session-bound TURN credentials
+        '401':
+          description: Authentication is required
+        '503':
+          description: Production TURN configuration is unavailable or invalid
+  /api/v1/calls/{call_id}:
+    get:
+      summary: Read durable call state as one of the two call parties
+      parameters:
+        - $ref: '#/components/parameters/CallId'
+      responses:
+        '200':
+          description: Durable call session metadata without SDP or ICE payloads
+        '403':
+          description: Caller is not a call party
+        '404':
+          description: Call was not found
+components:
+  parameters:
+    CallId:
+      name: call_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+x-socket-events:
+  inbound:
+    - call.invite
+    - call.accept
+    - webrtc.offer
+    - webrtc.answer
+    - webrtc.ice_candidate
+    - call.end
+  media-path: peer-to-peer WebRTC
+  signaling-persistence: SDP and ICE candidates are never persisted

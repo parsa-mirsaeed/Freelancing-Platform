@@ -6,6 +6,7 @@ from typing import Any
 
 from flask import Flask, g, request
 
+from app.calls.api import calls_bp
 from app.config import Settings
 from app.contracts.api import contracts_bp
 from app.disputes.api import disputes_bp
@@ -59,6 +60,7 @@ def create_app(config_overrides: Mapping[str, Any] | None = None) -> Flask:
     app.register_blueprint(messaging_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(disputes_bp)
+    app.register_blueprint(calls_bp)
     register_error_handlers(app)
     _register_request_context(app)
     return app
@@ -66,6 +68,7 @@ def create_app(config_overrides: Mapping[str, Any] | None = None) -> Flask:
 
 def _register_models() -> None:
     from app.audit import models as audit_models  # noqa: F401
+    from app.calls import models as call_models  # noqa: F401
     from app.common import models as common_models  # noqa: F401
     from app.contracts import models as contract_models  # noqa: F401
     from app.disputes import models as dispute_models  # noqa: F401
