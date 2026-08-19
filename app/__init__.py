@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Any
 
-from flask import Flask, g, request
+from flask import Flask, Response, g, request
 
 from app.calls.api import calls_bp
 from app.config import Settings
@@ -22,6 +22,7 @@ from app.ledger.api import ledger_bp
 from app.messaging.api import messaging_bp
 from app.milestones.api import milestones_bp
 from app.notifications.api import notifications_bp
+from app.observability import assign_trace_id, configure_observability, metrics_bp
 from app.payments.api import payments_bp
 from app.payouts.api import payouts_bp
 from app.portfolios.api import portfolios_bp
@@ -31,6 +32,7 @@ from app.realtime.service import init_realtime
 from app.recommendations.api import recommendations_bp
 from app.reviews.api import reviews_bp
 from app.search.api import search_bp
+from app.security import install_security_controls
 
 
 def create_app(config_overrides: Mapping[str, Any] | None = None) -> Flask:
@@ -65,8 +67,11 @@ def create_app(config_overrides: Mapping[str, Any] | None = None) -> Flask:
     app.register_blueprint(calls_bp)
     app.register_blueprint(recommendations_bp)
     app.register_blueprint(fraud_bp)
+    app.register_blueprint(metrics_bp)
     register_error_handlers(app)
+    configure_observability(app)
     _register_request_context(app)
+    install_security_controls(app)
     return app
 
 
@@ -96,11 +101,13 @@ def _register_models() -> None:
 
 def _register_request_context(app: Flask) -> None:
     @app.before_request
-    def assign_request_id() -> None:
+    def assign_request_context() -> None:
         incoming = request.headers.get("X-Request-ID")
         g.request_id = incoming[:64] if incoming else str(uuid.uuid4())
+        g.trace_id = assign_trace_id()
 
     @app.after_request
-    def attach_request_id(response):  # type: ignore[no-untyped-def]
+    def attach_request_context(response: Response) -> Response:
         response.headers["X-Request-ID"] = g.request_id
+        response.headers["X-Trace-ID"] = g.trace_id
         return response

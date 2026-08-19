@@ -15,7 +15,9 @@ domains:
       - app/extensions.py
       - app/errors.py
       - app/common/**
-      - pyproject.toml
+      - app/security.py
+      - app/observability.py
+      - app/feature_flags.py
     unit:
       - tests/unit
     flags: [python, database, redis, search, realtime, files]
@@ -239,6 +241,14 @@ domains:
       - tests/integration/test_calls.py
       - tests/integration/test_ai.py
     flags: [python, database]
+  dependencies:
+    paths:
+      - pyproject.toml
+    unit:
+      - tests/unit
+    integration:
+      - tests/integration
+    flags: [python, database, redis, search, realtime, files, dependencies]
   ci:
     paths:
       - ci/**
@@ -249,6 +259,10 @@ domains:
       - Dockerfile
       - infra/docker/**
     flags: [docker]
+  kubernetes:
+    paths:
+      - infra/kubernetes/**
+    flags: [k8s]
   docs:
     paths:
       - README.md

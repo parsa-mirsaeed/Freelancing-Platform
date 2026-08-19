@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_digest:
+        description: "sha256 digest produced by the successful main workflow"
+        required: true
+        type: string
+      source_sha:
+        description: "main commit SHA that produced the image"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/parsa-mirsaeed/freelancing-platform
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.value }}
+    steps:
+      - name: Validate immutable image identity
+        id: image
+        env:
+          DIGEST: ${{ inputs.image_digest }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          echo "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
+          echo "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+          echo "value=$IMAGE_REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
+      - name: Verify source commit is on main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+
+  production:
+    needs: validate
+    if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.PRODUCTION_KUBECONFIG_B64 }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          printf '%s' "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+      - name: Promote the exact main image digest
+        env:
+          IMAGE: ${{ needs.validate.outputs.image }}
+        run: |
+          for target in \
+            freelancing-api:api \
+            freelancing-socket:socket \
+            freelancing-worker:worker \
+            celery-payments:worker \
+            celery-notifications:worker \
+            celery-search:worker \
+            celery-files:worker; do
+            deployment="${target%%:*}"
+            container="${target##*:}"
+            kubectl -n freelancing set image "deployment/$deployment" "$container=$IMAGE"
+            kubectl -n freelancing rollout status "deployment/$deployment" --timeout=300s
+          done
+      - name: Production smoke
+        env:
+          PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+        run: curl --fail --silent --show-error "$PRODUCTION_BASE_URL/health/ready"

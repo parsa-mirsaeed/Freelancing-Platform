@@ -25,6 +25,8 @@ jobs:
       ci: ${{ steps.impact.outputs.ci }}
       docker: ${{ steps.impact.outputs.docker }}
       docs: ${{ steps.impact.outputs.docs }}
+      k8s: ${{ steps.impact.outputs.k8s }}
+      dependencies: ${{ steps.impact.outputs.dependencies }}
       unit_targets: ${{ steps.impact.outputs.unit_targets }}
       integration_targets: ${{ steps.impact.outputs.integration_targets }}
     steps:
@@ -247,6 +249,33 @@ jobs:
       - run: python -m pip install --disable-pip-version-check -e '.[dev]'
       - run: pytest -m search tests/integration/test_search.py
 
+  kubernetes:
+    name: Kubernetes policy validation
+    needs: changes
+    if: needs.changes.outputs.k8s == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check PyYAML~=6.0
+      - run: python ci/validate_k8s.py
+
+  dependencies:
+    name: Dependency audit
+    needs: changes
+    if: needs.changes.outputs.dependencies == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]' pip-audit
+      - run: pip-audit
+
   docs:
     name: Markdown formatting
     needs: changes
@@ -289,6 +318,8 @@ jobs:
       - realtime
       - files
       - search
+      - kubernetes
+      - dependencies
       - docs
       - image
     runs-on: ubuntu-latest
@@ -306,5 +337,7 @@ jobs:
           realtime=${{ needs.realtime.result }}
           files=${{ needs.files.result }}
           search=${{ needs.search.result }}
+          kubernetes=${{ needs.kubernetes.result }}
+          dependencies=${{ needs.dependencies.result }}
           docs=${{ needs.docs.result }}
           image=${{ needs.image.result }}

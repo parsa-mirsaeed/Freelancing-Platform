@@ -1,0 +1,180 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  full-core:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: freelancing
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d freelancing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "false"
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports: ["9200:9200"]
+        options: >-
+          --health-cmd "curl -fs http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/freelancing
+      REDIS_URL: redis://localhost:6379/15
+      ELASTICSEARCH_URL: http://localhost:9200
+      ELASTICSEARCH_INDEX_PREFIX: freelancing-nightly-${{ github.run_id }}
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: freelancing-nightly-${{ github.run_id }}
+      SECRET_KEY: nightly-only-secret
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Start MinIO
+        run: >-
+          docker run -d --rm --name minio-nightly
+          -p 9000:9000
+          -e MINIO_ROOT_USER=minioadmin
+          -e MINIO_ROOT_PASSWORD=minioadmin
+          minio/minio:latest server /data
+      - name: Wait for MinIO
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fs http://localhost:9000/minio/health/live; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: ruff check app ci tests
+      - run: ruff format --check app ci tests
+      - run: mypy app ci
+      - run: alembic upgrade head
+      - run: alembic check
+      - run: pytest -m unit tests/unit
+      - run: pytest -m 'db or redis or search or socket or files' tests/integration
+
+  migration-cycle:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: freelancing
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d freelancing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/freelancing
+      SECRET_KEY: nightly-only-secret
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: alembic upgrade head
+      - run: alembic downgrade base
+      - run: alembic upgrade head
+      - run: alembic check
+
+  backup-restore:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: freelancing
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d freelancing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/freelancing
+      PGPASSWORD: postgres
+      SECRET_KEY: nightly-only-secret
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check -e .
+      - run: alembic upgrade head
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Backup and restore into a separate database
+        run: |
+          pg_dump -h localhost -U postgres -Fc freelancing > /tmp/freelancing.dump
+          createdb -h localhost -U postgres freelancing_restore
+          pg_restore -h localhost -U postgres -d freelancing_restore /tmp/freelancing.dump
+          psql -h localhost -U postgres -d freelancing_restore -Atc 'select count(*) from alembic_version' | grep -qx '1'
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]' pip-audit bandit
+      - run: pip-audit
+      - run: bandit -q -r app
+      - run: python ci/validate_k8s.py
+
+  ai-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: pytest -m unit tests/unit/recommendations tests/unit/fraud
