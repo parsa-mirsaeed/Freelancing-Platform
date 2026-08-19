@@ -109,11 +109,7 @@ def _setup_database(path: Path, redis_url: str):  # type: ignore[no-untyped-def]
     return database_url, employer, freelancer, conversation
 
 
-def test_two_socket_servers_broadcast_via_redis(tmp_path: Path) -> None:
-    redis_url = "redis://localhost:6379/14"
-    database_url, employer, freelancer, conversation = _setup_database(
-        tmp_path / "socket.db", redis_url
-    )
+def _servers(database_url: str, redis_url: str):  # type: ignore[no-untyped-def]
     ports = (_free_port(), _free_port())
     context = multiprocessing.get_context("spawn")
     processes = [
@@ -122,10 +118,25 @@ def test_two_socket_servers_broadcast_via_redis(tmp_path: Path) -> None:
     ]
     for process in processes:
         process.start()
-    try:
-        for port in ports:
-            _wait_http(port)
+    for port in ports:
+        _wait_http(port)
+    return ports, processes
 
+
+def _stop_servers(processes) -> None:  # type: ignore[no-untyped-def]
+    for process in processes:
+        process.terminate()
+    for process in processes:
+        process.join(timeout=5)
+
+
+def test_two_socket_servers_broadcast_via_redis(tmp_path: Path) -> None:
+    redis_url = "redis://localhost:6379/14"
+    database_url, employer, freelancer, conversation = _setup_database(
+        tmp_path / "socket.db", redis_url
+    )
+    ports, processes = _servers(database_url, redis_url)
+    try:
         sender = socketio_client.Client(reconnection=False)
         receiver = socketio_client.Client(reconnection=False)
         received = threading.Event()
@@ -171,7 +182,138 @@ def test_two_socket_servers_broadcast_via_redis(tmp_path: Path) -> None:
                 transports=["polling"],
             )
     finally:
-        for process in processes:
-            process.terminate()
-        for process in processes:
-            process.join(timeout=5)
+        _stop_servers(processes)
+
+
+def test_webrtc_signaling_crosses_socket_servers_via_redis(tmp_path: Path) -> None:
+    redis_url = "redis://localhost:6379/13"
+    database_url, employer, freelancer, conversation = _setup_database(
+        tmp_path / "webrtc.db", redis_url
+    )
+    ports, processes = _servers(database_url, redis_url)
+    try:
+        caller = socketio_client.Client(reconnection=False)
+        callee = socketio_client.Client(reconnection=False)
+        invited = threading.Event()
+        accepted = threading.Event()
+        offer_received = threading.Event()
+        answer_received = threading.Event()
+        ice_received = threading.Event()
+        ended = threading.Event()
+        events: dict[str, dict[str, Any]] = {}
+
+        @callee.on("call.invite")
+        def on_invite(payload: dict[str, Any]) -> None:
+            events["invite"] = payload
+            invited.set()
+
+        @caller.on("call.accept")
+        def on_accept(payload: dict[str, Any]) -> None:
+            events["accept"] = payload
+            accepted.set()
+
+        @callee.on("webrtc.offer")
+        def on_offer(payload: dict[str, Any]) -> None:
+            events["offer"] = payload
+            offer_received.set()
+
+        @caller.on("webrtc.answer")
+        def on_answer(payload: dict[str, Any]) -> None:
+            events["answer"] = payload
+            answer_received.set()
+
+        @caller.on("webrtc.ice_candidate")
+        def on_ice(payload: dict[str, Any]) -> None:
+            events["ice"] = payload
+            ice_received.set()
+
+        @caller.on("call.end")
+        def on_end(payload: dict[str, Any]) -> None:
+            events["end"] = payload
+            ended.set()
+
+        caller.connect(
+            f"http://127.0.0.1:{ports[0]}",
+            auth={"token": employer["access_token"]},
+            transports=["polling"],
+        )
+        callee.connect(
+            f"http://127.0.0.1:{ports[1]}",
+            auth={"token": freelancer["access_token"]},
+            transports=["polling"],
+        )
+        invite_ack = caller.call(
+            "call.invite",
+            {
+                "conversation_id": conversation["id"],
+                "client_call_id": "webrtc-call-1",
+                "call_type": "VIDEO",
+            },
+        )
+        assert invite_ack["ok"] is True
+        call_id = invite_ack["call"]["id"]
+        assert invited.wait(timeout=5)
+        assert events["invite"]["call"]["id"] == call_id
+
+        premature = caller.call(
+            "webrtc.offer",
+            {
+                "call_id": call_id,
+                "description": {"type": "offer", "sdp": "v=0\r\n"},
+            },
+        )
+        assert premature["ok"] is False
+        assert premature["error"]["status"] == 409
+
+        accept_ack = callee.call("call.accept", {"call_id": call_id})
+        assert accept_ack["ok"] is True
+        assert accept_ack["call"]["status"] == "ACTIVE"
+        assert accepted.wait(timeout=5)
+        assert events["accept"]["call"]["id"] == call_id
+
+        assert caller.call(
+            "webrtc.offer",
+            {
+                "call_id": call_id,
+                "description": {"type": "offer", "sdp": "v=0\r\no=caller\r\n"},
+            },
+        )["ok"]
+        assert offer_received.wait(timeout=5)
+        assert events["offer"]["description"]["type"] == "offer"
+
+        assert callee.call(
+            "webrtc.answer",
+            {
+                "call_id": call_id,
+                "description": {"type": "answer", "sdp": "v=0\r\no=callee\r\n"},
+            },
+        )["ok"]
+        assert answer_received.wait(timeout=5)
+        assert events["answer"]["description"]["type"] == "answer"
+
+        assert callee.call(
+            "webrtc.ice_candidate",
+            {
+                "call_id": call_id,
+                "candidate": {
+                    "candidate": "candidate:1 1 UDP 2122260223 192.0.2.1 54400 typ host",
+                    "sdpMid": "0",
+                    "sdpMLineIndex": 0,
+                },
+            },
+        )["ok"]
+        assert ice_received.wait(timeout=5)
+        assert events["ice"]["call_id"] == call_id
+
+        end_ack = callee.call(
+            "call.end",
+            {"call_id": call_id, "reason": "finished"},
+        )
+        assert end_ack["ok"] is True
+        assert end_ack["call"]["status"] == "ENDED"
+        assert ended.wait(timeout=5)
+        assert events["end"]["call"]["id"] == call_id
+        caller.disconnect()
+        callee.disconnect()
+    finally:
+        _stop_servers(processes)

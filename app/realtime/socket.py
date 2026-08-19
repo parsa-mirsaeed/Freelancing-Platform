@@ -5,6 +5,16 @@ import uuid
 from flask import request
 from flask_socketio import emit, join_room
 
+from app.calls.publisher import publish_call_event
+from app.calls.service import (
+    accept_call,
+    end_call,
+    invite_call,
+    serialize_call,
+    signal_peer,
+    validate_ice_candidate,
+    validate_session_description,
+)
 from app.errors import ApiError
 from app.extensions import db, socketio
 from app.identity.models import User
@@ -152,6 +162,140 @@ def message_read(data: dict[str, object]) -> dict[str, object]:
     }
     publish_read_receipt(payload)
     return {"ok": True, **payload}
+
+
+@socketio.on("call.invite")  # type: ignore[untyped-decorator]
+def call_invite(data: dict[str, object]) -> dict[str, object]:
+    user = _require_socket_user()
+    try:
+        conversation_id = uuid.UUID(str(data["conversation_id"]))
+        client_call_id = str(data["client_call_id"])
+        call_type = str(data.get("call_type", "VIDEO"))
+    except (KeyError, TypeError, ValueError) as exc:
+        return _socket_error("validation_error", str(exc))
+    try:
+        call, created = invite_call(
+            user=user,
+            conversation_id=conversation_id,
+            client_call_id=client_call_id,
+            call_type=call_type,
+        )
+    except ApiError as exc:
+        db.session.rollback()
+        return _api_error(exc)
+    payload = serialize_call(call)
+    if created:
+        publish_call_event(
+            "call.invite",
+            target_user_id=call.callee_user_id,
+            payload={"call": payload},
+        )
+    return {"ok": True, "call": payload}
+
+
+@socketio.on("call.accept")  # type: ignore[untyped-decorator]
+def call_accept(data: dict[str, object]) -> dict[str, object]:
+    user = _require_socket_user()
+    try:
+        call_id = uuid.UUID(str(data["call_id"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        return _socket_error("validation_error", str(exc))
+    try:
+        call, changed = accept_call(user=user, call_id=call_id)
+    except ApiError as exc:
+        db.session.rollback()
+        return _api_error(exc)
+    payload = serialize_call(call)
+    if changed:
+        publish_call_event(
+            "call.accept",
+            target_user_id=call.caller_user_id,
+            payload={"call": payload},
+        )
+    return {"ok": True, "call": payload}
+
+
+@socketio.on("webrtc.offer")  # type: ignore[untyped-decorator]
+def webrtc_offer(data: dict[str, object]) -> dict[str, object]:
+    return _relay_description(data, event="webrtc.offer", expected_type="offer")
+
+
+@socketio.on("webrtc.answer")  # type: ignore[untyped-decorator]
+def webrtc_answer(data: dict[str, object]) -> dict[str, object]:
+    return _relay_description(data, event="webrtc.answer", expected_type="answer")
+
+
+@socketio.on("webrtc.ice_candidate")  # type: ignore[untyped-decorator]
+def webrtc_ice_candidate(data: dict[str, object]) -> dict[str, object]:
+    user = _require_socket_user()
+    try:
+        call_id = uuid.UUID(str(data["call_id"]))
+        candidate = validate_ice_candidate(data["candidate"])
+        _call, peer_id = signal_peer(user=user, call_id=call_id)
+    except (KeyError, TypeError, ValueError) as exc:
+        return _socket_error("validation_error", str(exc))
+    except ApiError as exc:
+        db.session.rollback()
+        return _api_error(exc)
+    payload = {
+        "call_id": str(call_id),
+        "from_user_id": str(user.id),
+        "candidate": candidate,
+    }
+    publish_call_event("webrtc.ice_candidate", target_user_id=peer_id, payload=payload)
+    return {"ok": True}
+
+
+@socketio.on("call.end")  # type: ignore[untyped-decorator]
+def call_end(data: dict[str, object]) -> dict[str, object]:
+    user = _require_socket_user()
+    try:
+        call_id = uuid.UUID(str(data["call_id"]))
+        reason = str(data.get("reason", ""))
+    except (KeyError, TypeError, ValueError) as exc:
+        return _socket_error("validation_error", str(exc))
+    try:
+        call, changed = end_call(user=user, call_id=call_id, reason=reason)
+    except ApiError as exc:
+        db.session.rollback()
+        return _api_error(exc)
+    payload = serialize_call(call)
+    if changed:
+        peer_id = call.callee_user_id if user.id == call.caller_user_id else call.caller_user_id
+        publish_call_event(
+            "call.end",
+            target_user_id=peer_id,
+            payload={"call": payload},
+        )
+    return {"ok": True, "call": payload}
+
+
+def _relay_description(
+    data: dict[str, object],
+    *,
+    event: str,
+    expected_type: str,
+) -> dict[str, object]:
+    user = _require_socket_user()
+    try:
+        call_id = uuid.UUID(str(data["call_id"]))
+        description = validate_session_description(
+            data["description"],
+            expected_type=expected_type,
+        )
+        _call, peer_id = signal_peer(user=user, call_id=call_id)
+    except (KeyError, TypeError, ValueError) as exc:
+        return _socket_error("validation_error", str(exc))
+    except ApiError as exc:
+        db.session.rollback()
+        return _api_error(exc)
+    payload = {
+        "call_id": str(call_id),
+        "from_user_id": str(user.id),
+        "description": description,
+    }
+    publish_call_event(event, target_user_id=peer_id, payload=payload)
+    return {"ok": True}
 
 
 def _sid() -> str:
