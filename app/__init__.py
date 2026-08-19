@@ -8,6 +8,7 @@ from flask import Flask, g, request
 
 from app.config import Settings
 from app.contracts.api import contracts_bp
+from app.disputes.api import disputes_bp
 from app.errors import register_error_handlers
 from app.extensions import db, elasticsearch_extension, redis_extension
 from app.files.api import files_bp
@@ -57,6 +58,7 @@ def create_app(config_overrides: Mapping[str, Any] | None = None) -> Flask:
     app.register_blueprint(files_bp)
     app.register_blueprint(messaging_bp)
     app.register_blueprint(notifications_bp)
+    app.register_blueprint(disputes_bp)
     register_error_handlers(app)
     _register_request_context(app)
     return app
@@ -66,6 +68,7 @@ def _register_models() -> None:
     from app.audit import models as audit_models  # noqa: F401
     from app.common import models as common_models  # noqa: F401
     from app.contracts import models as contract_models  # noqa: F401
+    from app.disputes import models as dispute_models  # noqa: F401
     from app.files import models as file_models  # noqa: F401
     from app.freelancers import models as freelancer_models  # noqa: F401
     from app.gigs import models as gig_models  # noqa: F401

@@ -1,0 +1,84 @@
+openapi: 3.1.0
+info:
+  title: Freelancing Platform Disputes API
+  version: 0.6.0
+paths:
+  /api/v1/milestones/{milestone_id}/disputes:
+    post:
+      summary: Open one dispute for a funded in-flight milestone and freeze release
+      parameters:
+        - $ref: '#/components/parameters/MilestoneId'
+      responses:
+        '201':
+          description: Dispute opened and milestone release frozen
+        '403':
+          description: Caller is not a contract party
+        '409':
+          description: Milestone cannot be disputed or already has a dispute
+  /api/v1/disputes/{dispute_id}:
+    get:
+      summary: Read a dispute as a party or administrator
+      parameters:
+        - $ref: '#/components/parameters/DisputeId'
+      responses:
+        '200':
+          description: Dispute including evidence metadata and final decision when present
+  /api/v1/disputes/{dispute_id}/evidence:
+    post:
+      summary: Attach a SAFE dispute-evidence file owned by a dispute party
+      parameters:
+        - $ref: '#/components/parameters/DisputeId'
+      responses:
+        '201':
+          description: Immutable evidence record created
+        '403':
+          description: Caller is not a dispute party or does not own the file
+        '409':
+          description: Evidence collection is closed or the file is not SAFE
+  /api/v1/disputes/{dispute_id}/transitions:
+    post:
+      summary: Move a dispute through the administrator review state machine
+      parameters:
+        - $ref: '#/components/parameters/DisputeId'
+      responses:
+        '200':
+          description: Transition recorded with immutable before and after state
+        '409':
+          description: Transition is not allowed from the current state
+  /api/v1/disputes/{dispute_id}/resolve:
+    post:
+      summary: Resolve escrow to freelancer, client, or an exact split
+      parameters:
+        - $ref: '#/components/parameters/DisputeId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Resolution committed as one balanced terminal ledger journal
+        '409':
+          description: Dispute is not reviewable or was already resolved
+        '422':
+          description: Outcome or split arithmetic is invalid
+components:
+  parameters:
+    MilestoneId:
+      name: milestone_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DisputeId:
+      name: dispute_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200

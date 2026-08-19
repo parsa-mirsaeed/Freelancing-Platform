@@ -52,7 +52,7 @@ class JournalTransaction(db.Model):  # type: ignore[name-defined,misc]
     __table_args__ = (
         CheckConstraint(
             "operation IN ('MILESTONE_FUND', 'MILESTONE_RELEASE', 'MILESTONE_REFUND', "
-            "'PAYOUT', 'REVERSAL')",
+            "'DISPUTE_RESOLUTION', 'PAYOUT', 'REVERSAL')",
             name="ck_journal_transactions_operation",
         ),
         UniqueConstraint(
