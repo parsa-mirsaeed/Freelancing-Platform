@@ -16,12 +16,12 @@ def test_identity_change_selects_only_identity_core() -> None:
     assert result["unit_targets"] == ["tests/unit/identity"]
 
 
-def test_bootstrap_change_uses_focused_app_smoke_without_search() -> None:
+def test_bootstrap_change_uses_focused_app_smoke_without_search_or_socket() -> None:
     result = calculate(["app/__init__.py"], load_config())
     assert result["domains"] == ["bootstrap"]
     assert result["flags"]["database"] is True
     assert result["flags"]["search"] is False
-    assert result["flags"]["realtime"] is True
+    assert result["flags"]["realtime"] is False
     assert result["unit_targets"] == ["tests/unit/test_app.py"]
     assert result["integration_targets"] == ["tests/integration/test_database.py"]
 
@@ -124,6 +124,29 @@ def test_shared_change_runs_full_unit_and_core_services() -> None:
     assert result["flags"]["files"] is True
 
 
+def test_kubernetes_change_runs_policy_validation_only() -> None:
+    result = calculate(["infra/kubernetes/base.yaml"], load_config())
+    assert result["domains"] == ["kubernetes"]
+    assert result["flags"]["k8s"] is True
+    assert result["flags"]["python"] is False
+    assert result["flags"]["database"] is False
+    assert result["unit_targets"] == []
+    assert result["integration_targets"] == []
+
+
+def test_dependency_change_runs_audit_and_full_core() -> None:
+    result = calculate(["pyproject.toml"], load_config())
+    assert result["domains"] == ["dependencies"]
+    assert result["flags"]["dependencies"] is True
+    assert result["flags"]["database"] is True
+    assert result["flags"]["redis"] is True
+    assert result["flags"]["search"] is True
+    assert result["flags"]["realtime"] is True
+    assert result["flags"]["files"] is True
+    assert result["unit_targets"] == ["tests/unit"]
+    assert result["integration_targets"] == ["tests/integration"]
+
+
 def test_unknown_change_falls_back_to_full_core() -> None:
     result = calculate(["new-area/unknown.py"], load_config())
     assert result["domains"] == ["fallback-full-core"]
@@ -144,4 +167,6 @@ def test_github_output_is_shell_safe(tmp_path: Path) -> None:
     assert "search=false" in text
     assert "realtime=false" in text
     assert "files=false" in text
+    assert "k8s=false" in text
+    assert "dependencies=false" in text
     assert "integration_targets=" in text

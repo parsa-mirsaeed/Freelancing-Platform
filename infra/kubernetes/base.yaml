@@ -1,0 +1,301 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: freelancing
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: freelancing-api
+  namespace: freelancing
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: freelancing-worker
+  namespace: freelancing
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: freelancing-runtime
+  namespace: freelancing
+data:
+  APP_ENV: production
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_PER_MINUTE: "120"
+  MAX_CONTENT_LENGTH: "16777216"
+  LOG_JSON: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: freelancing-api
+  namespace: freelancing
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: freelancing-api
+  template:
+    metadata:
+      labels:
+        app: freelancing-api
+    spec:
+      serviceAccountName: freelancing-api
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: ghcr.io/parsa-mirsaeed/freelancing-platform:main
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: freelancing-runtime
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: secret-key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: redis-url
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: s3-access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: s3-secret-key
+          securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: freelancing-api
+  namespace: freelancing
+spec:
+  selector:
+    app: freelancing-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: freelancing-worker
+  namespace: freelancing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: freelancing-worker
+  template:
+    metadata:
+      labels:
+        app: freelancing-worker
+    spec:
+      serviceAccountName: freelancing-worker
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: ghcr.io/parsa-mirsaeed/freelancing-platform:main
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - app.celery_worker.celery_app
+            - worker
+            - --loglevel=INFO
+            - --queues=default
+          envFrom:
+            - configMapRef:
+                name: freelancing-runtime
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: secret-key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: redis-url
+          securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: freelancing
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+  ingress: []
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-network
+  namespace: freelancing
+spec:
+  podSelector:
+    matchLabels:
+      app: freelancing-api
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              freelancing.io/data-plane: "true"
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 9200
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker-network
+  namespace: freelancing
+spec:
+  podSelector:
+    matchLabels:
+      app: freelancing-worker
+  policyTypes: ["Ingress", "Egress"]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              freelancing.io/data-plane: "true"
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 9200

@@ -9,8 +9,13 @@
 /app/disputes/ @parsa-mirsaeed
 /app/messaging/ @parsa-mirsaeed
 /app/realtime/ @parsa-mirsaeed
+/app/calls/ @parsa-mirsaeed
 /app/notifications/ @parsa-mirsaeed
 /app/files/ @parsa-mirsaeed
+/app/recommendations/ @parsa-mirsaeed
+/app/fraud/ @parsa-mirsaeed
+/app/security.py @parsa-mirsaeed
+/app/observability.py @parsa-mirsaeed
 /migrations/ @parsa-mirsaeed
 /.github/ @parsa-mirsaeed
 /infra/ @parsa-mirsaeed

@@ -20,6 +20,8 @@ ALL_FLAGS = (
     "ci",
     "docker",
     "docs",
+    "k8s",
+    "dependencies",
 )
 
 
