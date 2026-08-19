@@ -1,0 +1,99 @@
+openapi: 3.1.0
+info:
+  title: Freelancing Platform AI Baseline API
+  version: 0.8.0
+paths:
+  /api/v1/projects/{project_id}/recommendations:
+    get:
+      summary: Rank freelancer candidates for an employer-owned open project
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 10
+      responses:
+        '200':
+          description: Versioned deterministic recommendation run and ranked candidates
+        '403':
+          description: Caller does not own the project
+        '409':
+          description: Project is not open
+  /api/v1/recommendations/{run_id}/events:
+    post:
+      summary: Attribute a low-stakes impression or profile view to a recommendation run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '201':
+          description: Event recorded
+        '200':
+          description: Idempotent retry returned the existing event
+        '422':
+          description: Unsupported event or malformed payload
+  /api/v1/freelancers/me/ai/skill-suggestions:
+    get:
+      summary: Suggest canonical skills without mutating the freelancer profile
+      responses:
+        '200':
+          description: Versioned skill suggestions with confidence and evidence source
+  /api/v1/projects/{project_id}/ai/price-estimate:
+    get:
+      summary: Estimate a competitive project price interval
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Historical interquartile range, budget fallback, or insufficient-data result
+  /api/v1/admin/ml/models:
+    get:
+      summary: List registered AI/ML model versions and deployment metadata
+      responses:
+        '200':
+          description: Model registry entries
+        '403':
+          description: Admin role required
+  /api/v1/admin/risk/assessments:
+    post:
+      summary: Create an explainable fraud/spam risk assessment for human review
+      responses:
+        '201':
+          description: Assessment created; no automatic enforcement action is taken
+        '403':
+          description: Admin role required
+  /api/v1/admin/risk/assessments/{assessment_id}/review:
+    post:
+      summary: Clear or escalate a risk assessment without directly applying a heavy action
+      parameters:
+        - $ref: '#/components/parameters/AssessmentId'
+      responses:
+        '200':
+          description: Human review recorded
+        '422':
+          description: Decision must be CLEAR or ESCALATE
+components:
+  parameters:
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AssessmentId:
+      name: assessment_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid

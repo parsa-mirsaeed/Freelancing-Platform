@@ -13,6 +13,7 @@ from app.disputes.api import disputes_bp
 from app.errors import register_error_handlers
 from app.extensions import db, elasticsearch_extension, redis_extension
 from app.files.api import files_bp
+from app.fraud.api import fraud_bp
 from app.freelancers.api import freelancers_bp
 from app.gigs.api import gigs_bp
 from app.health import health_bp
@@ -27,6 +28,7 @@ from app.portfolios.api import portfolios_bp
 from app.projects.api import projects_bp
 from app.proposals.api import proposals_bp
 from app.realtime.service import init_realtime
+from app.recommendations.api import recommendations_bp
 from app.reviews.api import reviews_bp
 from app.search.api import search_bp
 
@@ -61,6 +63,8 @@ def create_app(config_overrides: Mapping[str, Any] | None = None) -> Flask:
     app.register_blueprint(notifications_bp)
     app.register_blueprint(disputes_bp)
     app.register_blueprint(calls_bp)
+    app.register_blueprint(recommendations_bp)
+    app.register_blueprint(fraud_bp)
     register_error_handlers(app)
     _register_request_context(app)
     return app
@@ -73,6 +77,7 @@ def _register_models() -> None:
     from app.contracts import models as contract_models  # noqa: F401
     from app.disputes import models as dispute_models  # noqa: F401
     from app.files import models as file_models  # noqa: F401
+    from app.fraud import models as fraud_models  # noqa: F401
     from app.freelancers import models as freelancer_models  # noqa: F401
     from app.gigs import models as gig_models  # noqa: F401
     from app.identity import models as identity_models  # noqa: F401
@@ -85,6 +90,7 @@ def _register_models() -> None:
     from app.portfolios import models as portfolio_models  # noqa: F401
     from app.projects import models as project_models  # noqa: F401
     from app.proposals import models as proposal_models  # noqa: F401
+    from app.recommendations import models as recommendation_models  # noqa: F401
     from app.reviews import models as review_models  # noqa: F401
 
 
