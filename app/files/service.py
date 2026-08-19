@@ -157,6 +157,23 @@ def get_file_for_user(*, user: User, file_id: uuid.UUID) -> FileObject:
         )
     )
     if authorized is None:
+        from app.disputes.models import DisputeEvidence, DisputeParty
+
+        assigned_roles = {assignment.role for assignment in user.roles}
+        if "admin" in assigned_roles:
+            authorized = db.session.scalar(
+                select(DisputeEvidence.id).where(DisputeEvidence.file_id == file_id)
+            )
+        if authorized is None:
+            authorized = db.session.scalar(
+                select(DisputeEvidence.id)
+                .join(DisputeParty, DisputeParty.dispute_id == DisputeEvidence.dispute_id)
+                .where(
+                    DisputeEvidence.file_id == file_id,
+                    DisputeParty.user_id == user.id,
+                )
+            )
+    if authorized is None:
         raise ApiError("forbidden", "Forbidden", 403, "You may not access this file")
     return file_object
 

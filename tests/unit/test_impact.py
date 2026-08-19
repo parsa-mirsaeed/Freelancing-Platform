@@ -56,6 +56,18 @@ def test_ledger_change_selects_money_invariants_without_external_services() -> N
     assert result["integration_targets"] == ["tests/integration/test_money.py"]
 
 
+def test_dispute_change_selects_only_unit_and_postgres_invariants() -> None:
+    result = calculate(["app/disputes/service.py"], load_config())
+    assert result["domains"] == ["disputes"]
+    assert result["flags"]["database"] is True
+    assert result["flags"]["redis"] is False
+    assert result["flags"]["search"] is False
+    assert result["flags"]["realtime"] is False
+    assert result["flags"]["files"] is False
+    assert result["unit_targets"] == ["tests/unit/disputes"]
+    assert result["integration_targets"] == ["tests/integration/test_disputes.py"]
+
+
 def test_messaging_change_selects_postgres_and_realtime_only() -> None:
     result = calculate(["app/messaging/service.py"], load_config())
     assert result["domains"] == ["messaging"]

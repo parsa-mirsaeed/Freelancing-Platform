@@ -131,6 +131,16 @@ domains:
     integration:
       - tests/integration/test_money.py
     flags: [python, database]
+  disputes:
+    paths:
+      - app/disputes/**
+      - tests/unit/disputes/**
+      - tests/integration/test_disputes.py
+    unit:
+      - tests/unit/disputes
+    integration:
+      - tests/integration/test_disputes.py
+    flags: [python, database]
   messaging:
     paths:
       - app/messaging/**
@@ -196,6 +206,7 @@ domains:
       - tests/integration/test_contracts.py
       - tests/integration/test_money.py
       - tests/integration/test_communication.py
+      - tests/integration/test_disputes.py
     flags: [python, database]
   ci:
     paths:
