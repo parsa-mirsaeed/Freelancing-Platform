@@ -8,11 +8,12 @@ import pytest
 from app import create_app
 from app.extensions import db, elasticsearch_extension
 from app.search.tasks import drain_search_outbox
+from tests.helpers import auth_header, register_user
 
 pytestmark = pytest.mark.search
 
 
-def test_freelancer_projection_is_searchable() -> None:
+def test_freelancer_projection_is_searchable_and_recommendable() -> None:
     prefix = f"freelancing-ci-{uuid.uuid4()}"
     app = create_app(
         {
@@ -28,18 +29,15 @@ def test_freelancer_projection_is_searchable() -> None:
         db.create_all()
         try:
             with app.test_client() as client:
-                registered = client.post(
-                    "/api/v1/auth/register",
-                    json={
-                        "email": f"search-{uuid.uuid4()}@example.com",
-                        "password": "correct horse battery staple",
-                        "role": "freelancer",
-                    },
-                ).get_json()
-                headers = {"Authorization": f"Bearer {registered['access_token']}"}
+                freelancer = register_user(
+                    client,
+                    email=f"search-{uuid.uuid4()}@example.com",
+                    role="freelancer",
+                )
+                freelancer_headers = auth_header(freelancer)
                 profile = client.put(
                     "/api/v1/freelancers/me/profile",
-                    headers=headers,
+                    headers=freelancer_headers,
                     json={
                         "title": "Flask Search Specialist",
                         "bio": "PostgreSQL and API architecture",
@@ -56,8 +54,55 @@ def test_freelancer_projection_is_searchable() -> None:
                 assert search.status_code == 200
                 items = search.get_json()["items"]
                 assert len(items) == 1
-                assert items[0]["freelancer_id"] == registered["user"]["id"]
+                assert items[0]["freelancer_id"] == freelancer["user"]["id"]
                 assert items[0]["projection_version"] == profile.get_json()["projection_version"]
+
+                employer = register_user(
+                    client,
+                    email=f"recommend-{uuid.uuid4()}@example.com",
+                    role="employer",
+                )
+                project = client.post(
+                    "/api/v1/projects",
+                    headers=auth_header(employer),
+                    json={
+                        "title": "Flask API project",
+                        "description": "Build a Python Flask backend",
+                        "skills": ["Python", "Flask"],
+                        "budget_min_minor": 80000,
+                        "budget_max_minor": 120000,
+                        "currency": "USD",
+                    },
+                ).get_json()
+                recommendation = client.get(
+                    f"/api/v1/projects/{project['id']}/recommendations?limit=5",
+                    headers=auth_header(employer),
+                )
+                assert recommendation.status_code == 200
+                recommendation_body = recommendation.get_json()
+                assert recommendation_body["model_version"] == "rule-v1"
+                assert recommendation_body["feature_version"] == "matching-features-v1"
+                assert recommendation_body["items"][0]["freelancer_id"] == freelancer["user"]["id"]
+                assert recommendation_body["items"][0]["features"]["skill_match"] == 1.0
+
+                event_payload = {
+                    "freelancer_user_id": freelancer["user"]["id"],
+                    "event_type": "IMPRESSION",
+                    "client_event_id": "recommendation-impression-1",
+                }
+                first_event = client.post(
+                    f"/api/v1/recommendations/{recommendation_body['run_id']}/events",
+                    headers=auth_header(employer),
+                    json=event_payload,
+                )
+                retry_event = client.post(
+                    f"/api/v1/recommendations/{recommendation_body['run_id']}/events",
+                    headers=auth_header(employer),
+                    json=event_payload,
+                )
+                assert first_event.status_code == 201
+                assert retry_event.status_code == 200
+                assert first_event.get_json()["id"] == retry_event.get_json()["id"]
         finally:
             client = elasticsearch_extension.get_client()
             client.indices.delete(index=f"{prefix}-freelancers-v1", ignore_unavailable=True)

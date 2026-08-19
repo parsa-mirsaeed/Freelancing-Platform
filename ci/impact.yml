@@ -8,7 +8,7 @@ domains:
       - tests/unit/test_app.py
     integration:
       - tests/integration/test_database.py
-    flags: [python, database, realtime]
+    flags: [python, database]
   shared:
     paths:
       - app/config.py
@@ -207,6 +207,25 @@ domains:
     integration:
       - tests/integration/test_search.py
     flags: [python, search]
+  recommendations:
+    paths:
+      - app/recommendations/**
+      - tests/unit/recommendations/**
+    unit:
+      - tests/unit/recommendations
+    integration:
+      - tests/integration/test_ai.py
+      - tests/integration/test_search.py
+    flags: [python, database, search]
+  fraud:
+    paths:
+      - app/fraud/**
+      - tests/unit/fraud/**
+    unit:
+      - tests/unit/fraud
+    integration:
+      - tests/integration/test_ai.py
+    flags: [python, database]
   database:
     paths:
       - migrations/**
@@ -218,6 +237,7 @@ domains:
       - tests/integration/test_communication.py
       - tests/integration/test_disputes.py
       - tests/integration/test_calls.py
+      - tests/integration/test_ai.py
     flags: [python, database]
   ci:
     paths:
