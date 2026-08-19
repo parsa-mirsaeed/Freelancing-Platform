@@ -1,0 +1,53 @@
+@layer components {
+  .site-header[data-path="/login"],
+  .site-header[data-path="/register"],
+  .site-header[data-path="/dashboard"] {
+    color: var(--ink);
+  }
+
+  .site-header[data-path="/login"] .header-inner,
+  .site-header[data-path="/register"] .header-inner,
+  .site-header[data-path="/dashboard"] .header-inner {
+    border-bottom-color: #dfe5e1;
+  }
+
+  .site-header[data-path="/login"] .brand-mark,
+  .site-header[data-path="/register"] .brand-mark,
+  .site-header[data-path="/dashboard"] .brand-mark {
+    border-color: #aebbb4;
+  }
+
+  .site-header[data-path="/login"] .desktop-nav,
+  .site-header[data-path="/register"] .desktop-nav,
+  .site-header[data-path="/dashboard"] .desktop-nav,
+  .site-header[data-path="/login"] .header-quiet,
+  .site-header[data-path="/register"] .header-quiet,
+  .site-header[data-path="/dashboard"] .header-quiet {
+    color: #53625b;
+  }
+
+  .site-header[data-path="/login"] .desktop-nav a:hover,
+  .site-header[data-path="/register"] .desktop-nav a:hover,
+  .site-header[data-path="/dashboard"] .desktop-nav a:hover,
+  .site-header[data-path="/login"] .header-quiet:hover,
+  .site-header[data-path="/register"] .header-quiet:hover,
+  .site-header[data-path="/dashboard"] .header-quiet:hover {
+    color: var(--ink);
+  }
+
+  .site-header[data-path="/login"] .header-primary,
+  .site-header[data-path="/register"] .header-primary,
+  .site-header[data-path="/dashboard"] .header-primary {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: #ffffff;
+  }
+
+  .site-header[data-path="/login"] .mobile-menu-button,
+  .site-header[data-path="/register"] .mobile-menu-button,
+  .site-header[data-path="/dashboard"] .mobile-menu-button {
+    border-color: #d6ded9;
+    background: #ffffff;
+    color: var(--ink);
+  }
+}

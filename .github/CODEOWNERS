@@ -16,6 +16,7 @@
 /app/fraud/ @parsa-mirsaeed
 /app/security.py @parsa-mirsaeed
 /app/observability.py @parsa-mirsaeed
+/frontend/ @parsa-mirsaeed
 /migrations/ @parsa-mirsaeed
 /.github/ @parsa-mirsaeed
 /infra/ @parsa-mirsaeed

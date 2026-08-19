@@ -22,6 +22,9 @@ ALL_FLAGS = (
     "docs",
     "k8s",
     "dependencies",
+    "frontend",
+    "frontend_e2e",
+    "frontend_dependencies",
 )
 
 
@@ -47,6 +50,8 @@ def calculate(changed_paths: list[str], config: dict[str, Any]) -> dict[str, Any
     domains: list[str] = []
     unit_targets: set[str] = set()
     integration_targets: set[str] = set()
+    frontend_unit_targets: set[str] = set()
+    frontend_e2e_targets: set[str] = set()
 
     for domain, mapping in config["domains"].items():
         if any(matches(path, pattern) for path in changed_paths for pattern in mapping["paths"]):
@@ -57,6 +62,8 @@ def calculate(changed_paths: list[str], config: dict[str, Any]) -> dict[str, Any
                 flags[flag] = True
             unit_targets.update(mapping.get("unit", []))
             integration_targets.update(mapping.get("integration", []))
+            frontend_unit_targets.update(mapping.get("frontend_unit", []))
+            frontend_e2e_targets.update(mapping.get("frontend_e2e", []))
 
     if not domains and changed_paths:
         for flag in ("python", "database", "redis", "search", "realtime", "files"):
@@ -70,6 +77,8 @@ def calculate(changed_paths: list[str], config: dict[str, Any]) -> dict[str, Any
         "flags": flags,
         "unit_targets": _minimize_targets(unit_targets),
         "integration_targets": _minimize_targets(integration_targets),
+        "frontend_unit_targets": _minimize_targets(frontend_unit_targets),
+        "frontend_e2e_targets": _minimize_targets(frontend_e2e_targets),
     }
 
 
@@ -88,6 +97,8 @@ def write_github_output(result: dict[str, Any], destination: Path) -> None:
         lines.append(f"{flag}={'true' if enabled else 'false'}")
     lines.append("unit_targets=" + " ".join(result["unit_targets"]))
     lines.append("integration_targets=" + " ".join(result["integration_targets"]))
+    lines.append("frontend_unit_targets=" + " ".join(result["frontend_unit_targets"]))
+    lines.append("frontend_e2e_targets=" + " ".join(result["frontend_e2e_targets"]))
     with destination.open("a", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")
 
