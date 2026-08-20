@@ -264,9 +264,25 @@ domains:
       - frontend/.npmrc
       - frontend/package-lock.json
     frontend_unit:
-      - tests/unit
+      - tests/unit/intl.test.ts
+      - tests/unit/proxy-policy.test.ts
     frontend_e2e:
       - tests/e2e/smoke.spec.ts
+    flags: [frontend, frontend_e2e]
+  frontend-discovery:
+    paths:
+      - frontend/src/app/talent/**
+      - frontend/src/app/(dashboard)/dashboard/profile/**
+      - frontend/src/features/profile/**
+      - frontend/src/lib/api/marketplace.ts
+      - frontend/src/lib/server/marketplace.ts
+      - frontend/tests/unit/marketplace.test.ts
+      - frontend/tests/e2e/discovery.spec.ts
+      - frontend/tests/e2e/mock-backend.mjs
+    frontend_unit:
+      - tests/unit/marketplace.test.ts
+    frontend_e2e:
+      - tests/e2e/discovery.spec.ts
     flags: [frontend, frontend_e2e]
   frontend-dependencies:
     paths:
@@ -274,7 +290,8 @@ domains:
       - frontend/.npmrc
       - frontend/package-lock.json
     frontend_unit:
-      - tests/unit
+      - tests/unit/intl.test.ts
+      - tests/unit/proxy-policy.test.ts
     frontend_e2e:
       - tests/e2e/smoke.spec.ts
     flags: [frontend, frontend_e2e, frontend_dependencies]
