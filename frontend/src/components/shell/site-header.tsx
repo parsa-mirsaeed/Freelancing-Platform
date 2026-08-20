@@ -9,8 +9,8 @@ import { useSession } from "@/components/providers/session-provider";
 
 const nav = [
   { href: "/talent", label: "Find talent" },
-  { href: "/#workflow", label: "How it works" },
-  { href: "/#capabilities", label: "Platform" },
+  { href: "/services", label: "Services" },
+  { href: "/projects", label: "Projects" },
 ];
 
 export function SiteHeader() {

@@ -1,0 +1,57 @@
+.workspace { min-height: 100vh; padding: 7rem clamp(1rem,4vw,3rem) 6rem; background: #f4f6f2; color: #10201a; }
+.workspaceIntro { display: flex; align-items: end; justify-content: space-between; gap: 2rem; width: min(1240px,100%); margin: 0 auto 2.2rem; }
+.workspaceIntro > div { max-width: 850px; }
+.workspaceIntro p,.sectionTitle span { margin: 0; color: #5c7467; font-size: .7rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+.workspaceIntro h1 { margin: .75rem 0; font-size: clamp(2.2rem,4.8vw,4.7rem); line-height: 1; letter-spacing: -.055em; }
+.workspaceIntro span { color: #627169; line-height: 1.65; }
+.workspaceIntro > a { flex: 0 0 auto; color: #245a41; font-size: .82rem; font-weight: 760; text-decoration: none; }
+.twoColumn { display: grid; grid-template-columns: minmax(0,1fr) minmax(420px,.85fr); gap: 1.1rem; width: min(1240px,100%); margin: 0 auto; align-items: start; }
+.inventory,.editor { border: 1px solid #d9e0da; border-radius: 1.25rem; background: #fff; }
+.inventory { padding: 1.2rem; }
+.editor { display: grid; gap: 1rem; padding: 1.35rem; position: sticky; top: 6.5rem; }
+.sectionTitle { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.sectionTitle h2 { margin: .35rem 0 0; font-size: 1.35rem; letter-spacing: -.035em; }
+.sectionTitle button,.inventoryActions button,.addRow,.editorActions button,.requirementRow > button { min-height: 2.5rem; border: 1px solid #cdd8d1; border-radius: .7rem; background: #fff; color: #244033; font: inherit; font-size: .76rem; font-weight: 740; cursor: pointer; }
+.sectionTitle button { padding: 0 .8rem; }
+.inventoryCard { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 1rem; padding: 1rem 0; border-top: 1px solid #e6ebe7; }
+.inventoryCard:first-of-type { border-top: 0; }
+.inventoryCard > div:first-child > span { color: #668072; font-size: .68rem; font-weight: 780; letter-spacing: .08em; text-transform: uppercase; }
+.inventoryCard h3 { margin: .35rem 0 .4rem; font-size: 1.03rem; }
+.inventoryCard p { margin: 0; color: #66756d; font-size: .84rem; line-height: 1.55; }
+.inventoryCard small { display: block; margin-top: .6rem; color: #50655a; font-weight: 700; }
+.inventoryActions { display: flex; align-items: center; gap: .4rem; }
+.inventoryActions a { color: #315e48; font-size: .75rem; font-weight: 720; text-decoration: none; }
+.inventoryActions button { padding: 0 .65rem; }
+.inventoryActions .danger { border-color: #e8c5c2; color: #8d3933; }
+.empty,.constraintNote { color: #68776f; font-size: .8rem; line-height: 1.55; }
+.constraintNote { margin: 1rem 0 0; padding: .8rem; border-radius: .7rem; background: #f5f8f5; }
+.editor label { display: grid; gap: .38rem; color: #30483c; font-size: .75rem; font-weight: 720; }
+.editor label > span { color: #829087; font-weight: 500; }
+.editor input,.editor textarea { width: 100%; box-sizing: border-box; border: 1px solid #cbd7cf; border-radius: .75rem; background: #fbfcfb; padding: .72rem .78rem; color: #10201a; font: inherit; font-size: .86rem; }
+.editor textarea { resize: vertical; }
+.shortField { max-width: 130px; }
+.check { display: flex !important; grid-template-columns: none; flex-direction: row; align-items: center; gap: .55rem !important; }
+.check input { width: 1rem; height: 1rem; padding: 0; }
+.packageEditor,.requirementEditor,.budget { display: grid; gap: .8rem; margin: .2rem 0 0; padding: 0; border: 0; }
+.packageEditor legend,.requirementEditor legend,.budget legend { margin-bottom: .7rem; color: #27473a; font-size: .8rem; font-weight: 800; }
+.packageRow { padding: .9rem; border: 1px solid #dde4df; border-radius: .85rem; background: #fafbfa; }
+.packageHeading { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
+.packageHeading > span { color: #728179; font-size: .7rem; }
+.packageFields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .65rem; }
+.packageFields .full { grid-column: 1 / -1; }
+.requirementRow { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: .6rem; align-items: end; padding: .75rem; border: 1px solid #dde4df; border-radius: .8rem; }
+.requirementRow > button { padding: 0 .7rem; }
+.addRow { width: fit-content; padding: 0 .8rem; }
+.budget > p { margin: -.35rem 0 .2rem; color: #718078; font-size: .74rem; }
+.budget > div { display: grid; grid-template-columns: 1fr 1fr 100px; gap: .65rem; }
+.editorActions { display: flex; gap: .6rem; padding-top: .25rem; }
+.editorActions button { padding: 0 1rem; }
+.editorActions button:first-child { border-color: #183d2c; background: #183d2c; color: #f4fbf6; }
+.editorActions button:disabled { opacity: .55; cursor: wait; }
+.error,.success { margin: 0; padding: .75rem .8rem; border-radius: .7rem; font-size: .8rem; line-height: 1.45; }
+.error { background: #fff0ee; color: #8c312b; }
+.success { background: #edf8f0; color: #245d39; }
+.loading { min-height: 70vh; display: grid; align-content: center; justify-items: start; gap: .6rem; max-width: 900px; margin: 0 auto; padding: 6rem 1.5rem; color: #233c30; }
+.loading a { color: #245a41; font-weight: 750; }
+@media (max-width: 1040px) { .twoColumn { grid-template-columns: 1fr; } .editor { position: static; } }
+@media (max-width: 680px) { .workspace { padding-top: 6.5rem; } .workspaceIntro { align-items: start; flex-direction: column; } .inventoryCard { grid-template-columns: 1fr; } .inventoryActions { justify-content: flex-start; flex-wrap: wrap; } .packageFields,.budget > div { grid-template-columns: 1fr; } .requirementRow { grid-template-columns: 1fr; align-items: start; } }
