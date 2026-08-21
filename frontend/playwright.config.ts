@@ -23,13 +23,21 @@ export default defineConfig({
       use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
     },
   ],
-  webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1",
-    url: "http://127.0.0.1:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    env: {
-      BACKEND_API_URL: process.env.BACKEND_API_URL ?? "http://127.0.0.1:8000",
+  webServer: [
+    {
+      command: "node tests/e2e/support/mock-backend.mjs",
+      url: "http://127.0.0.1:8000/health/live",
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
     },
-  },
+    {
+      command: "npm run dev -- --hostname 127.0.0.1",
+      url: "http://127.0.0.1:3000",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      env: {
+        BACKEND_API_URL: process.env.BACKEND_API_URL ?? "http://127.0.0.1:8000",
+      },
+    },
+  ],
 });
