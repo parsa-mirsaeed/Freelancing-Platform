@@ -1,43 +1,52 @@
 @layer components {
   .site-header[data-path="/login"],
   .site-header[data-path="/register"],
-  .site-header[data-path="/dashboard"] {
+  .site-header[data-path^="/dashboard"],
+  .site-header[data-path^="/talent"] {
     color: var(--ink);
   }
 
   .site-header[data-path="/login"] .header-inner,
   .site-header[data-path="/register"] .header-inner,
-  .site-header[data-path="/dashboard"] .header-inner {
+  .site-header[data-path^="/dashboard"] .header-inner,
+  .site-header[data-path^="/talent"] .header-inner {
     border-bottom-color: #dfe5e1;
   }
 
   .site-header[data-path="/login"] .brand-mark,
   .site-header[data-path="/register"] .brand-mark,
-  .site-header[data-path="/dashboard"] .brand-mark {
+  .site-header[data-path^="/dashboard"] .brand-mark,
+  .site-header[data-path^="/talent"] .brand-mark {
     border-color: #aebbb4;
   }
 
   .site-header[data-path="/login"] .desktop-nav,
   .site-header[data-path="/register"] .desktop-nav,
-  .site-header[data-path="/dashboard"] .desktop-nav,
+  .site-header[data-path^="/dashboard"] .desktop-nav,
+  .site-header[data-path^="/talent"] .desktop-nav,
   .site-header[data-path="/login"] .header-quiet,
   .site-header[data-path="/register"] .header-quiet,
-  .site-header[data-path="/dashboard"] .header-quiet {
+  .site-header[data-path^="/dashboard"] .header-quiet,
+  .site-header[data-path^="/talent"] .header-quiet {
     color: #53625b;
   }
 
   .site-header[data-path="/login"] .desktop-nav a:hover,
   .site-header[data-path="/register"] .desktop-nav a:hover,
-  .site-header[data-path="/dashboard"] .desktop-nav a:hover,
+  .site-header[data-path^="/dashboard"] .desktop-nav a:hover,
+  .site-header[data-path^="/talent"] .desktop-nav a:hover,
   .site-header[data-path="/login"] .header-quiet:hover,
   .site-header[data-path="/register"] .header-quiet:hover,
-  .site-header[data-path="/dashboard"] .header-quiet:hover {
+  .site-header[data-path^="/dashboard"] .header-quiet:hover,
+  .site-header[data-path^="/talent"] .header-quiet:hover,
+  .site-header[data-path^="/talent"] .desktop-nav a[aria-current="page"] {
     color: var(--ink);
   }
 
   .site-header[data-path="/login"] .header-primary,
   .site-header[data-path="/register"] .header-primary,
-  .site-header[data-path="/dashboard"] .header-primary {
+  .site-header[data-path^="/dashboard"] .header-primary,
+  .site-header[data-path^="/talent"] .header-primary {
     border-color: var(--ink);
     background: var(--ink);
     color: #ffffff;
@@ -45,9 +54,21 @@
 
   .site-header[data-path="/login"] .mobile-menu-button,
   .site-header[data-path="/register"] .mobile-menu-button,
-  .site-header[data-path="/dashboard"] .mobile-menu-button {
+  .site-header[data-path^="/dashboard"] .mobile-menu-button,
+  .site-header[data-path^="/talent"] .mobile-menu-button {
     border-color: #d6ded9;
     background: #ffffff;
     color: var(--ink);
+  }
+
+  .mobile-nav button {
+    min-height: 44px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
 }
