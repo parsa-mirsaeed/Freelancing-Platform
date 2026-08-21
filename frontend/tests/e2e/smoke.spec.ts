@@ -74,7 +74,7 @@ test("public profile combines profile, SAFE portfolio metadata, and reviews", as
   await expect(page.getByText(/Clear architecture/)).toBeVisible();
 });
 
-test("freelancer edits profile through the same-origin BFF", async ({ page }) => {
+test("freelancer edits profile and removes a published rate through the BFF", async ({ page }) => {
   await page.route("**/api/session/me", async (route) => {
     await route.fulfill({
       status: 200,
@@ -86,7 +86,12 @@ test("freelancer edits profile through the same-origin BFF", async ({ page }) =>
     if (route.request().method() === "PUT") {
       const body = route.request().postDataJSON() as Record<string, unknown>;
       expect(body.title).toBe("Principal Platform Engineer");
-      expect(body.hourly_rate_minor).toBe(15050);
+      if (body.hourly_rate_minor === null) {
+        expect(body.currency).toBeNull();
+      } else {
+        expect(body.hourly_rate_minor).toBe(15050);
+        expect(body.currency).toBe("USD");
+      }
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -107,6 +112,53 @@ test("freelancer edits profile through the same-origin BFF", async ({ page }) =>
   await page.getByLabel("Hourly rate").fill("150.50");
   await page.getByRole("button", { name: "Save profile" }).click();
   await expect(page.getByText("Professional profile saved.")).toBeVisible();
+
+  await page.getByLabel("Hourly rate").fill("");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await expect(page.getByLabel("Currency")).toHaveValue("");
+});
+
+test("new freelancer can publish a base profile before portfolio exists", async ({ page }) => {
+  let portfolioReads = 0;
+  await page.route("**/api/session/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ id: USER_ID, email: "new@example.com", roles: ["freelancer"] }),
+    });
+  });
+  await page.route("**/api/backend/freelancers/me/profile", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { code: "profile_not_found", message: "Freelancer profile not found" } }) });
+      return;
+    }
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...profile,
+        ...body,
+        id: profile.id,
+        user_id: USER_ID,
+        projection_version: 1,
+        availability: { rules: [], exceptions: [] },
+      }),
+    });
+  });
+  await page.route(`**/api/backend/freelancers/${USER_ID}/portfolio`, async (route) => {
+    portfolioReads += 1;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) });
+  });
+
+  await page.goto("/dashboard/profile");
+  await expect(page.getByRole("button", { name: "Publish profile" })).toBeVisible();
+  expect(portfolioReads).toBe(0);
+  await page.getByLabel("Professional title").fill("Systems Engineer");
+  await page.getByLabel("Skills").fill("Python, PostgreSQL");
+  await page.getByRole("button", { name: "Publish profile" }).click();
+  await expect(page.getByText("Professional profile saved.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Add time window" })).toBeEnabled();
 });
 
 test("employer account does not receive freelancer editing controls", async ({ page }) => {
