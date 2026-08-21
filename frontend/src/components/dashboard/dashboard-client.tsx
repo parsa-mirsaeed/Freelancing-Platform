@@ -20,19 +20,27 @@ export function DashboardClient() {
   }
   if (!user) return null;
 
-  const primaryRole = user.roles.includes("employer") ? "Employer" : user.roles.includes("freelancer") ? "Freelancer" : "Member";
+  const freelancer = user.roles.includes("freelancer");
+  const employer = user.roles.includes("employer");
+  const primaryRole = employer ? "Employer" : freelancer ? "Freelancer" : "Member";
+
   return (
     <main className="dashboard-shell">
       <section className="dashboard-welcome">
         <div><p className="dashboard-context">{primaryRole} workspace</p><h1>Welcome back.</h1><p>{user.email}</p></div>
-        <Link className="dashboard-exit" href="/">Public marketplace</Link>
+        <Link className="dashboard-exit" href="/talent">Public marketplace</Link>
       </section>
-      <section className="foundation-status" aria-labelledby="foundation-title">
-        <div className="section-heading"><h2 id="foundation-title">Frontend foundation connected</h2><p>This first frontend slice establishes secure session handling and the product system. Domain workspaces arrive in the following PRs.</p></div>
+      <section className="foundation-status" aria-labelledby="workspace-title">
+        <div className="section-heading"><h2 id="workspace-title">Your next workspace</h2><p>The frontend now connects the marketplace discovery and professional profile domains while backend authorization remains authoritative.</p></div>
         <div className="status-list">
-          <article><ShieldIcon /><div><strong>HttpOnly session boundary</strong><span>Browser JavaScript never receives access or refresh tokens.</span></div></article>
-          <article><WalletIcon /><div><strong>Backend-aligned transport</strong><span>Authenticated product requests flow through a same-origin BFF proxy.</span></div></article>
-          <article><SparkIcon /><div><strong>Role-aware application shell</strong><span>Freelancer and employer workflows can now build on one consistent foundation.</span></div></article>
+          {freelancer ? (
+            <article><SparkIcon /><div><strong>Professional profile</strong><span>Publish expertise, languages, exact rate, availability, and portfolio.</span><Link href="/dashboard/profile">Open profile studio →</Link></div></article>
+          ) : null}
+          {employer ? (
+            <article><SparkIcon /><div><strong>Talent discovery</strong><span>Search the Elasticsearch projection by expertise, skills, and availability.</span><Link href="/talent">Find talent →</Link></div></article>
+          ) : null}
+          <article><ShieldIcon /><div><strong>Server-side session boundary</strong><span>Browser JavaScript never receives access or refresh tokens.</span></div></article>
+          <article><WalletIcon /><div><strong>Backend-authoritative marketplace</strong><span>Profile writes and search results use the existing Flask domain APIs without client-side policy duplication.</span></div></article>
         </div>
       </section>
     </main>
