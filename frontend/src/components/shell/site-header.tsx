@@ -8,6 +8,7 @@ import { MenuIcon } from "@/components/icons";
 import { useSession } from "@/components/providers/session-provider";
 
 const nav = [
+  { href: "/talent", label: "Find talent" },
   { href: "/#workflow", label: "How it works" },
   { href: "/#capabilities", label: "Platform" },
 ];
@@ -20,6 +21,7 @@ export function SiteHeader() {
 
   async function handleSignOut() {
     await signOut();
+    setOpen(false);
     router.push("/");
     router.refresh();
   }
@@ -32,7 +34,7 @@ export function SiteHeader() {
           <span>Freelancing Platform</span>
         </Link>
         <nav className="desktop-nav" aria-label="Primary navigation">
-          {nav.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
+          {nav.map((item) => <Link key={item.href} href={item.href} aria-current={pathname === item.href ? "page" : undefined}>{item.label}</Link>)}
         </nav>
         <div className="header-actions">
           {status === "authenticated" && user ? (
@@ -54,8 +56,17 @@ export function SiteHeader() {
       {open ? (
         <nav className="mobile-nav" aria-label="Mobile navigation">
           {nav.map((item) => <Link key={item.href} href={item.href} onClick={() => setOpen(false)}>{item.label}</Link>)}
-          <Link href="/login" onClick={() => setOpen(false)}>Sign in</Link>
-          <Link href="/register" onClick={() => setOpen(false)}>Join the platform</Link>
+          {status === "authenticated" && user ? (
+            <>
+              <Link href="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
+              <button type="button" onClick={handleSignOut}>Sign out</button>
+            </>
+          ) : (
+            <>
+              <Link href="/login" onClick={() => setOpen(false)}>Sign in</Link>
+              <Link href="/register" onClick={() => setOpen(false)}>Join the platform</Link>
+            </>
+          )}
         </nav>
       ) : null}
     </header>
