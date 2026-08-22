@@ -3,6 +3,7 @@ from sqlalchemy import select
 
 from app.extensions import db
 from app.identity.models import UserSession
+from app.identity.security import REALTIME_TICKET_TTL_SECONDS, decode_token
 
 pytestmark = pytest.mark.unit
 
@@ -28,6 +29,17 @@ def test_register_refresh_me_and_logout(client) -> None:  # type: ignore[no-unty
     assert me.status_code == 200
     assert me.get_json()["email"] == "freelancer@example.com"
 
+    ticket = client.post(
+        "/api/v1/auth/realtime-ticket",
+        headers={"Authorization": f"Bearer {body['access_token']}"},
+    )
+    assert ticket.status_code == 200
+    ticket_body = ticket.get_json()
+    assert ticket_body["token_type"] == "Realtime"
+    realtime_claims = decode_token(ticket_body["token"], expected_type="realtime")
+    assert realtime_claims["sub"] == body["user"]["id"]
+    assert 0 < realtime_claims["exp"] - realtime_claims["iat"] <= REALTIME_TICKET_TTL_SECONDS
+
     refreshed = client.post("/api/v1/auth/refresh", json={"refresh_token": body["refresh_token"]})
     assert refreshed.status_code == 200
     refreshed_body = refreshed.get_json()
@@ -51,6 +63,11 @@ def test_register_refresh_me_and_logout(client) -> None:  # type: ignore[no-unty
     session = db.session.scalar(select(UserSession))
     assert session is not None
     assert session.revoked_at is not None
+
+
+def test_realtime_ticket_requires_authenticated_session(client) -> None:  # type: ignore[no-untyped-def]
+    response = client.post("/api/v1/auth/realtime-ticket")
+    assert response.status_code == 401
 
 
 def test_duplicate_email_is_rejected(client) -> None:  # type: ignore[no-untyped-def]

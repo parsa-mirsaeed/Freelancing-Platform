@@ -5,6 +5,7 @@ from flask import Blueprint, g, jsonify, request
 from app.common.http import require_json_object, require_string
 from app.identity.auth import require_access_token
 from app.identity.models import User
+from app.identity.security import issue_realtime_ticket
 from app.identity.service import login_user, refresh_session, register_user, revoke_session
 
 identity_bp = Blueprint("identity", __name__, url_prefix="/api/v1/auth")
@@ -36,6 +37,20 @@ def refresh():  # type: ignore[no-untyped-def]
     payload = require_json_object(request)
     access, refresh_token = refresh_session(require_string(payload, "refresh_token"))
     return jsonify({"access_token": access, "refresh_token": refresh_token, "token_type": "Bearer"})
+
+
+@identity_bp.post("/realtime-ticket")
+@require_access_token
+def realtime_ticket():  # type: ignore[no-untyped-def]
+    user: User = g.current_user
+    token, expires_at = issue_realtime_ticket(user, g.current_session_id)
+    return jsonify(
+        {
+            "token": token,
+            "token_type": "Realtime",
+            "expires_at": expires_at.isoformat(),
+        }
+    )
 
 
 @identity_bp.post("/logout")

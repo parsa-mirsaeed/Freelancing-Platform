@@ -6,6 +6,23 @@ info:
 servers:
   - url: /api/v1
 paths:
+  /auth/realtime-ticket:
+    post:
+      security: [{bearerAuth: []}]
+      summary: Issue a short-lived session-bound realtime connection ticket
+      responses:
+        '200':
+          description: Realtime connection ticket
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, token_type, expires_at]
+                properties:
+                  token: {type: string}
+                  token_type: {type: string, const: Realtime}
+                  expires_at: {type: string, format: date-time}
+        '401': {description: Authentication required}
   /contracts/{contract_id}/conversation:
     post:
       security: [{bearerAuth: []}]
