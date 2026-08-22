@@ -8,11 +8,18 @@ export default function DashboardPage() {
   return (
     <>
       <DashboardClient />
-      <p style={{ width: "min(1180px, calc(100% - 40px))", margin: "-56px auto 88px" }}>
-        <Link href="/dashboard/disputes">
-          Open dispute cases and arbitration queue →
-        </Link>
-      </p>
+      <div
+        style={{
+          width: "min(1180px, calc(100% - 40px))",
+          margin: "-56px auto 88px",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "16px",
+        }}
+      >
+        <Link href="/dashboard/disputes">Open dispute cases and arbitration queue →</Link>
+        <Link href="/dashboard/calls">Open voice, video, and screen-sharing calls →</Link>
+      </div>
     </>
   );
 }

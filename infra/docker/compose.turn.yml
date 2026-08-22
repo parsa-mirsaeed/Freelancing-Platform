@@ -1,0 +1,26 @@
+services:
+  turn:
+    image: coturn/coturn:4.17.2-r0-alpine
+    command:
+      - --no-cli
+      - --log-file=stdout
+      - --fingerprint
+      - --use-auth-secret
+      - --static-auth-secret=development-only-turn-secret
+      - --realm=freelancing.local
+      - --listening-port=3478
+      - --min-port=49160
+      - --max-port=49200
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "49160-49200:49160-49200/udp"
+    tmpfs:
+      - /var/lib/coturn
+
+  api:
+    environment:
+      STUN_URLS: stun:localhost:3478
+      TURN_URLS: turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp
+      TURN_SHARED_SECRET: development-only-turn-secret
+      TURN_CREDENTIAL_TTL_SECONDS: "600"

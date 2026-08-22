@@ -359,6 +359,18 @@ domains:
     frontend_e2e:
       - tests/e2e/communication.spec.ts
     flags: [frontend, frontend_e2e]
+  frontend-calls:
+    paths:
+      - frontend/src/app/(dashboard)/dashboard/calls/**
+      - frontend/src/features/calls/**
+      - frontend/src/lib/api/calls.ts
+      - frontend/tests/unit/calls.test.ts
+      - frontend/tests/e2e/calls.spec.ts
+    frontend_unit:
+      - tests/unit/calls.test.ts
+    frontend_e2e:
+      - tests/e2e/calls.spec.ts
+    flags: [frontend, frontend_e2e]
   frontend-disputes:
     paths:
       - frontend/src/app/(dashboard)/dashboard/disputes/**
