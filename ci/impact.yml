@@ -284,6 +284,26 @@ domains:
     frontend_e2e:
       - tests/e2e/discovery.spec.ts
     flags: [frontend, frontend_e2e]
+  frontend-work:
+    paths:
+      - frontend/src/app/services/**
+      - frontend/src/app/projects/**
+      - frontend/src/app/(dashboard)/dashboard/gigs/**
+      - frontend/src/app/(dashboard)/dashboard/projects/**
+      - frontend/src/features/work/**
+      - frontend/src/lib/api/product-client.ts
+      - frontend/src/lib/api/work.ts
+      - frontend/src/lib/server/work.ts
+      - frontend/src/components/dashboard/dashboard-client.tsx
+      - frontend/src/components/shell/site-header.tsx
+      - frontend/tests/unit/work.test.ts
+      - frontend/tests/e2e/work.spec.ts
+      - frontend/tests/e2e/mock-backend.mjs
+    frontend_unit:
+      - tests/unit/work.test.ts
+    frontend_e2e:
+      - tests/e2e/work.spec.ts
+    flags: [frontend, frontend_e2e]
   frontend-dependencies:
     paths:
       - frontend/package.json

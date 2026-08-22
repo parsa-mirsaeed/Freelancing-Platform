@@ -32,7 +32,9 @@ export function DashboardClient() {
         <div className="section-heading"><h2 id="workspace-title">Your marketplace workspace</h2><p>The interface exposes only workflows your role can use; the backend still enforces every authorization and state transition.</p></div>
         <div className="status-list">
           {isFreelancer ? <article><SparkIcon /><div><strong><Link href="/dashboard/profile">Professional profile</Link></strong><span>Manage public expertise, rate guidance, availability, and portfolio.</span></div></article> : null}
+          {isFreelancer ? <article><WalletIcon /><div><strong><Link href="/dashboard/gigs">Services</Link></strong><span>Package active services with Basic, Standard, and Premium delivery terms.</span></div></article> : null}
           {isEmployer ? <article><SparkIcon /><div><strong><Link href="/talent">Find talent</Link></strong><span>Search professionals by expertise and current availability.</span></div></article> : null}
+          {isEmployer ? <article><WalletIcon /><div><strong><Link href="/dashboard/projects">Projects</Link></strong><span>Publish and refine open briefs; close only after backend completion rules pass.</span></div></article> : null}
           <article><ShieldIcon /><div><strong>Secure session boundary</strong><span>Browser JavaScript never receives access or refresh tokens.</span></div></article>
           <article><WalletIcon /><div><strong>Backend-aligned transport</strong><span>Authenticated product requests flow through the same-origin BFF proxy.</span></div></article>
         </div>
