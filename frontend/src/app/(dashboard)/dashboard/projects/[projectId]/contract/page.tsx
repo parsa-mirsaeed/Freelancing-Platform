@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { ContractWorkspace } from "@/features/contracts/contract-workspace";
 import { ContractMoneyWorkspace } from "@/features/money/contract-money-workspace";
@@ -16,6 +17,11 @@ export default async function ProjectContractPage({ params }: { params: Params }
     <>
       <ContractWorkspace projectId={projectId} />
       <ContractMoneyWorkspace projectId={projectId} />
+      <p style={{ width: "min(1180px, calc(100% - 40px))", margin: "0 auto 90px" }}>
+        <Link href={`/dashboard/messages?project=${encodeURIComponent(projectId)}`}>
+          Open private contract messages →
+        </Link>
+      </p>
     </>
   );
 }

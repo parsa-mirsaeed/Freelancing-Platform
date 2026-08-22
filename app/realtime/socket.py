@@ -26,7 +26,7 @@ from app.messaging.service import (
     serialize_message,
 )
 from app.realtime.auth import authenticate_socket_token, load_socket_user
-from app.realtime.presence import bind_socket, heartbeat, socket_identity, unbind_socket
+from app.realtime.presence import bind_socket, heartbeat, is_online, socket_identity, unbind_socket
 from app.realtime.publisher import (
     publish_delivery_receipt,
     publish_message,
@@ -64,6 +64,27 @@ def presence_heartbeat() -> dict[str, object]:
     user = _require_socket_user()
     heartbeat(user_id=user.id, sid=_sid())
     return {"ok": True}
+
+
+@socketio.on("presence.query")  # type: ignore[untyped-decorator]
+def presence_query(data: dict[str, object]) -> dict[str, object]:
+    user = _require_socket_user()
+    try:
+        conversation_id = uuid.UUID(str(data["conversation_id"]))
+    except (KeyError, ValueError) as exc:
+        return _socket_error("validation_error", str(exc))
+    try:
+        conversation = get_conversation_for_user(user=user, conversation_id=conversation_id)
+    except ApiError as exc:
+        return _api_error(exc)
+    return {
+        "ok": True,
+        "conversation_id": str(conversation.id),
+        "members": [
+            {"user_id": str(member.user_id), "online": is_online(member.user_id)}
+            for member in conversation.members
+        ],
+    }
 
 
 @socketio.on("conversation.join")  # type: ignore[untyped-decorator]
