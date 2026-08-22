@@ -116,7 +116,12 @@ export function ProjectDetail({ project }: { project: Project }) {
       </section>
       <section className={styles.projectDetailBody}>
         <div><span>Required expertise</span><div className={styles.skills}>{project.skills.map((skill) => <span key={skill}>{skill}</span>)}</div></div>
-        <aside><span>Published budget</span><strong>{budget(project)}</strong><p>Final milestones, delivery terms, and price are captured in the accepted proposal and contract.</p><Link href="/register">Join to submit a proposal</Link></aside>
+        <aside>
+          <span>Published budget</span>
+          <strong>{budget(project)}</strong>
+          <p>Final milestones, delivery terms, and price are captured in the accepted proposal and contract.</p>
+          <Link href={`/projects/${project.id}/proposal`}>Submit a proposal</Link>
+        </aside>
       </section>
     </main>
   );
