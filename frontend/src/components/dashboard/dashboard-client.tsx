@@ -36,6 +36,7 @@ export function DashboardClient() {
           {isFreelancer ? <article><WalletIcon /><div><strong><Link href="/dashboard/wallet">Wallet & payouts</Link></strong><span>Review ledger-derived currency balances and request idempotent payouts.</span></div></article> : null}
           {isEmployer ? <article><SparkIcon /><div><strong><Link href="/talent">Find talent</Link></strong><span>Search professionals by expertise and current availability.</span></div></article> : null}
           {isEmployer ? <article><WalletIcon /><div><strong><Link href="/dashboard/projects">Projects</Link></strong><span>Publish and refine open briefs; close only after backend completion rules pass.</span></div></article> : null}
+          <article><SparkIcon /><div><strong><Link href="/dashboard/messages">Messages & notifications</Link></strong><span>Open persisted contract chat, SAFE attachments, receipts, and notification preferences.</span></div></article>
           <article><ShieldIcon /><div><strong>Secure session boundary</strong><span>Browser JavaScript never receives access or refresh tokens.</span></div></article>
           <article><WalletIcon /><div><strong>Backend-aligned transport</strong><span>Authenticated product requests flow through the same-origin BFF proxy.</span></div></article>
         </div>

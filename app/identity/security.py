@@ -13,6 +13,7 @@ from flask import current_app
 from app.identity.models import User
 
 _password_hasher = PasswordHasher()
+REALTIME_TICKET_TTL_SECONDS = 60
 
 
 def hash_password(password: str) -> str:
@@ -67,6 +68,25 @@ def issue_token_pair(user: User, session_id: uuid.UUID) -> tuple[str, str, str, 
         algorithm="HS256",
     )
     return access, refresh, refresh_jti, refresh_expiry
+
+
+def issue_realtime_ticket(user: User, session_id: uuid.UUID) -> tuple[str, datetime]:
+    """Issue a short-lived session-bound token scoped only to realtime connection auth."""
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(seconds=REALTIME_TICKET_TTL_SECONDS)
+    token = jwt.encode(
+        {
+            "sub": str(user.id),
+            "sid": str(session_id),
+            "iat": now,
+            "exp": expires_at,
+            "jti": str(uuid.uuid4()),
+            "type": "realtime",
+        },
+        current_app.config["SECRET_KEY"],
+        algorithm="HS256",
+    )
+    return token, expires_at
 
 
 def decode_token(token: str, *, expected_type: str) -> dict[str, Any]:
