@@ -319,40 +319,26 @@ def _relay_description(
     return {"ok": True}
 
 
-@socketio.on("call.end")  # type: ignore[untyped-decorator]
-def call_end_duplicate_guard(data: dict[str, object]) -> dict[str, object]:
-    return call_end(data)
-
-
-def _socket_error(code: str, detail: str) -> dict[str, object]:
-    return {
-        "ok": False,
-        "error": {"type": code, "title": "Realtime request failed", "status": 422, "detail": detail},
-    }
-
-
-def _api_error(error: ApiError) -> dict[str, object]:
-    return {
-        "ok": False,
-        "error": {
-            "type": error.type,
-            "title": error.title,
-            "status": error.status,
-            "detail": error.detail,
-        },
-    }
-
-
 def _sid() -> str:
-    return str(request.sid)  # type: ignore[attr-defined,no-any-return]
+    return str(getattr(request, "sid", ""))
 
 
 def _require_socket_user() -> User:
     identity = socket_identity(_sid())
     if identity is None:
+        emit("error", {"type": "unauthorized", "detail": "Socket is not authenticated"})
         raise ConnectionRefusedError("Socket is not authenticated")
     user_id, session_id = identity
     user = load_socket_user(user_id=user_id, session_id=session_id)
     if user is None:
-        raise ConnectionRefusedError("Socket session is no longer active")
+        emit("error", {"type": "unauthorized", "detail": "Socket session is unavailable"})
+        raise ConnectionRefusedError("Socket session is unavailable")
     return user
+
+
+def _api_error(error: ApiError) -> dict[str, object]:
+    return _socket_error(error.type, error.detail, status=error.status)
+
+
+def _socket_error(error_type: str, detail: str, *, status: int = 422) -> dict[str, object]:
+    return {"ok": False, "error": {"type": error_type, "status": status, "detail": detail}}
