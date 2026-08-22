@@ -41,7 +41,7 @@ def load_config() -> dict[str, Any]:
 def matches(path: str, pattern: str) -> bool:
     if pattern.endswith("/**"):
         prefix = pattern[:-3]
-        return path == prefix or path.startswith(prefix + "/")
+        return fnmatch.fnmatch(path, prefix) or fnmatch.fnmatch(path, prefix + "/*")
     return fnmatch.fnmatch(path, pattern)
 
 

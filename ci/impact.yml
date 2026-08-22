@@ -304,6 +304,20 @@ domains:
     frontend_e2e:
       - tests/e2e/work.spec.ts
     flags: [frontend, frontend_e2e]
+  frontend-proposals:
+    paths:
+      - frontend/src/app/projects/*/proposal/**
+      - frontend/src/app/(dashboard)/dashboard/projects/*/proposals/**
+      - frontend/src/app/(dashboard)/dashboard/proposals/**
+      - frontend/src/features/proposals/**
+      - frontend/src/lib/api/proposals.ts
+      - frontend/tests/unit/proposals.test.ts
+      - frontend/tests/e2e/proposals.spec.ts
+    frontend_unit:
+      - tests/unit/proposals.test.ts
+    frontend_e2e:
+      - tests/e2e/proposals.spec.ts
+    flags: [frontend, frontend_e2e]
   frontend-dependencies:
     paths:
       - frontend/package.json
