@@ -19,15 +19,17 @@ import {
   type Conversation,
   type FileObject,
   type Message,
+  type MessageReceipt,
   type NotificationItem,
   type NotificationPreference,
 } from "@/lib/api/communication";
 import { formatDateTime } from "@/lib/intl";
 
 import styles from "./communication.module.css";
+import { useRealtimeConversation } from "./use-realtime-conversation";
 
 type StagedFile = Pick<FileObject, "id" | "original_name" | "status">;
-type ConnectionState = "connecting" | "fallback" | "live";
+type ReceiptEvent = { conversation_id: string; user_id: string; through_sequence: number };
 
 const NOTIFICATION_CHANNELS = ["IN_APP", "EMAIL", "PUSH", "SMS"] as const;
 
@@ -37,6 +39,12 @@ function mergeMessages(current: Message[], incoming: Message[]): Message[] {
   return [...byId.values()].sort((a, b) => a.sequence - b.sequence);
 }
 
+function mergeNotifications(current: NotificationItem[], incoming: NotificationItem[]): NotificationItem[] {
+  const byId = new Map(current.map((item) => [item.id, item]));
+  for (const item of incoming) byId.set(item.id, item);
+  return [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
 function conversationLabel(conversation: Conversation, userId: string): string {
   const other = conversation.members.find((member) => member.user_id !== userId);
   return other ? `Conversation with ${other.user_id.slice(0, 8)}…` : "Contract conversation";
@@ -44,10 +52,32 @@ function conversationLabel(conversation: Conversation, userId: string): string {
 
 function receiptLabel(message: Message, userId: string): string {
   if (message.sender_user_id !== userId) return `Sequence ${message.sequence}`;
-  const ownReceipts = message.receipts.filter((receipt) => receipt.user_id !== userId);
-  if (ownReceipts.some((receipt) => receipt.type === "READ")) return "Read";
-  if (ownReceipts.some((receipt) => receipt.type === "DELIVERED")) return "Delivered";
+  const peerReceipts = message.receipts.filter((receipt) => receipt.user_id !== userId);
+  if (peerReceipts.some((receipt) => receipt.type === "READ")) return "Read";
+  if (peerReceipts.some((receipt) => receipt.type === "DELIVERED")) return "Delivered";
   return "Persisted";
+}
+
+function applyReceipt(
+  current: Message[],
+  event: ReceiptEvent,
+  type: "DELIVERED" | "READ",
+): Message[] {
+  const createdAt = new Date().toISOString();
+  return current.map((message) => {
+    if (message.conversation_id !== event.conversation_id || message.sequence > event.through_sequence) {
+      return message;
+    }
+    const withoutOlder = message.receipts.filter(
+      (receipt) =>
+        !(
+          receipt.user_id === event.user_id &&
+          (receipt.type === type || (type === "READ" && receipt.type === "DELIVERED"))
+        ),
+    );
+    const receipt: MessageReceipt = { user_id: event.user_id, type, created_at: createdAt };
+    return { ...message, receipts: [...withoutOlder, receipt] };
+  });
 }
 
 export function CommunicationWorkspace({
@@ -68,9 +98,23 @@ export function CommunicationWorkspace({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [connection, setConnection] = useState<ConnectionState>("connecting");
   const pendingClientMessageId = useRef("");
   const latestSequence = useRef(0);
+
+  const realtime = useRealtimeConversation({
+    conversationId: selectedId,
+    userId: user?.id ?? "",
+    onMessage: (created) => {
+      latestSequence.current = Math.max(latestSequence.current, created.sequence);
+      setMessages((current) => mergeMessages(current, [created]));
+    },
+    onReceipt: (event, type) => {
+      setMessages((current) => applyReceipt(current, event, type));
+    },
+    onNotification: (notification) => {
+      setNotifications((current) => mergeNotifications(current, [notification]));
+    },
+  });
 
   useEffect(() => {
     if (status !== "authenticated" || !user) return;
@@ -102,12 +146,10 @@ export function CommunicationWorkspace({
         setSelectedId((current) =>
           current || conversationResult.opened?.id || nextConversations[0]?.id || "",
         );
-        setConnection("fallback");
         setError("");
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) return;
-        setConnection("fallback");
         setError(reason instanceof Error ? reason.message : "Unable to open communication workspace.");
       });
     return () => controller.abort();
@@ -133,7 +175,7 @@ export function CommunicationWorkspace({
   }, [selectedId, status]);
 
   useEffect(() => {
-    if (!selectedId || status !== "authenticated" || connection === "live") return;
+    if (!selectedId || status !== "authenticated" || realtime.state === "live") return;
     const interval = window.setInterval(() => {
       const after = latestSequence.current;
       void listMessages(selectedId, after, 100)
@@ -147,7 +189,7 @@ export function CommunicationWorkspace({
         .catch(() => undefined);
     }, 8000);
     return () => window.clearInterval(interval);
-  }, [connection, selectedId, status]);
+  }, [realtime.state, selectedId, status]);
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => item.id === selectedId) ?? null,
@@ -175,12 +217,24 @@ export function CommunicationWorkspace({
     setError("");
     setMessage("");
     try {
-      const persisted = await sendMessage({
-        conversationId: selectedId,
-        clientMessageId,
-        body: normalized,
-        attachmentIds: safeAttachmentIds,
-      });
+      let persisted: Message | null = null;
+      try {
+        persisted = await realtime.sendLive({
+          clientMessageId,
+          body: normalized,
+          attachmentIds: safeAttachmentIds,
+        });
+      } catch {
+        // A lost realtime ACK is safe to retry over REST with the identical client_message_id.
+      }
+      if (!persisted) {
+        persisted = await sendMessage({
+          conversationId: selectedId,
+          clientMessageId,
+          body: normalized,
+          attachmentIds: safeAttachmentIds,
+        });
+      }
       pendingClientMessageId.current = "";
       latestSequence.current = Math.max(latestSequence.current, persisted.sequence);
       setMessages((current) => mergeMessages(current, [persisted]));
@@ -349,9 +403,12 @@ export function CommunicationWorkspace({
                 <span className={styles.eyebrow}>Server ordered</span>
                 <h3>{selectedConversation ? conversationLabel(selectedConversation, user.id) : "Select a conversation"}</h3>
                 {selectedConversation?.contract_id ? <p className={styles.threadMeta}>Contract {selectedConversation.contract_id.slice(0, 12)}…</p> : null}
+                {realtime.state === "live" && realtime.peerOnline !== null ? (
+                  <p className={styles.threadMeta}>{realtime.peerOnline ? "Other party online" : "Other party currently offline"}</p>
+                ) : null}
               </div>
-              <span className={styles.connectionState} data-state={connection}>
-                {connection === "live" ? "Live" : connection === "connecting" ? "Connecting" : "Cursor sync"}
+              <span className={styles.connectionState} data-state={realtime.state}>
+                {realtime.state === "live" ? "Live" : realtime.state === "connecting" ? "Connecting" : "Cursor sync"}
               </span>
             </div>
           </header>
