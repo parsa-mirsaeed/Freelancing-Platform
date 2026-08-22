@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Freelancing Platform Disputes API
-  version: 0.6.0
+  version: 0.7.0
 paths:
   /api/v1/milestones/{milestone_id}/disputes:
     post:
@@ -15,6 +15,26 @@ paths:
           description: Caller is not a contract party
         '409':
           description: Milestone cannot be disputed or already has a dispute
+  /api/v1/disputes:
+    get:
+      summary: List disputes visible to the authenticated party or administrator
+      parameters:
+        - name: after
+          in: query
+          schema: {type: string, format: uuid}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [OPEN, EVIDENCE_COLLECTION, UNDER_REVIEW, NEED_MORE_INFO, RESOLVED]
+      responses:
+        '200':
+          description: Cursor-bounded authorized dispute inbox with milestone financial context
+        '422':
+          description: Pagination cursor, limit, or status filter is invalid
   /api/v1/disputes/{dispute_id}:
     get:
       summary: Read a dispute as a party or administrator
@@ -22,7 +42,7 @@ paths:
         - $ref: '#/components/parameters/DisputeId'
       responses:
         '200':
-          description: Dispute including evidence metadata and final decision when present
+          description: Dispute including milestone context, evidence metadata, events, and final decision
   /api/v1/disputes/{dispute_id}/evidence:
     post:
       summary: Attach a SAFE dispute-evidence file owned by a dispute party
