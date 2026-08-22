@@ -346,6 +346,19 @@ domains:
     frontend_e2e:
       - tests/e2e/money.spec.ts
     flags: [frontend, frontend_e2e]
+  frontend-communication:
+    paths:
+      - frontend/src/app/(dashboard)/dashboard/messages/**
+      - frontend/src/features/communication/**
+      - frontend/src/lib/api/communication.ts
+      - frontend/src/lib/realtime/**
+      - frontend/tests/unit/communication.test.ts
+      - frontend/tests/e2e/communication.spec.ts
+    frontend_unit:
+      - tests/unit/communication.test.ts
+    frontend_e2e:
+      - tests/e2e/communication.spec.ts
+    flags: [frontend, frontend_e2e]
   frontend-dependencies:
     paths:
       - frontend/package.json
