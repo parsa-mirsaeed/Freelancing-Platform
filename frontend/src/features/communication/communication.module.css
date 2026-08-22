@@ -1,0 +1,501 @@
+.page {
+  width: min(1240px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 30px 0 90px;
+  display: grid;
+  gap: 18px;
+}
+
+.hero,
+.workspace,
+.notificationsPanel {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 24px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+  gap: 28px;
+  padding: clamp(26px, 5vw, 52px);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ink) 97%, black), var(--ink));
+  color: white;
+}
+
+.hero p,
+.heading p,
+.muted,
+.empty,
+.threadMeta,
+.composerHint,
+.notificationMeta {
+  color: var(--muted);
+}
+
+.hero p {
+  margin: 8px 0 0;
+  color: color-mix(in srgb, white 68%, transparent);
+  line-height: 1.6;
+}
+
+.hero h1 {
+  margin: 9px 0 0;
+  font-size: clamp(2.2rem, 5vw, 4.8rem);
+  line-height: 0.96;
+  letter-spacing: -0.055em;
+}
+
+.hero aside {
+  align-self: end;
+  border: 1px solid color-mix(in srgb, white 15%, transparent);
+  border-radius: 18px;
+  padding: 19px;
+  background: color-mix(in srgb, white 6%, transparent);
+}
+
+.hero aside strong {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 310px minmax(0, 1fr);
+  min-height: 620px;
+  overflow: hidden;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  background: var(--surface-raised);
+}
+
+.heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.heading h2,
+.heading h3 {
+  margin: 5px 0 0;
+  letter-spacing: -0.03em;
+}
+
+.heading p {
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 760;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.conversationList,
+.messageList,
+.notificationList,
+.pendingFiles,
+.preferenceGrid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conversationList {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.conversationButton {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  text-align: left;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.conversationButton[aria-current="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.conversationButton strong,
+.conversationButton span {
+  display: block;
+}
+
+.conversationButton span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.thread {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.threadHeader {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.threadMeta {
+  margin: 7px 0 0;
+  font-size: 0.84rem;
+}
+
+.connectionState {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+}
+
+.connectionState::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.connectionState[data-state="live"] {
+  color: #17694f;
+}
+
+.messageScroller {
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
+}
+
+.messageList {
+  display: grid;
+  gap: 14px;
+}
+
+.message {
+  max-width: min(76%, 680px);
+  border: 1px solid var(--border);
+  border-radius: 18px 18px 18px 6px;
+  padding: 13px 15px;
+  background: var(--surface-raised);
+}
+
+.message[data-own="true"] {
+  justify-self: end;
+  border-radius: 18px 18px 6px 18px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.message p {
+  margin: 0;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 10px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.attachmentList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.attachmentButton,
+.secondaryButton,
+.notificationButton,
+.preferenceToggle {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.attachmentButton {
+  padding: 7px 9px;
+  font-size: 0.78rem;
+}
+
+.composer {
+  border-top: 1px solid var(--border);
+  padding: 18px 22px 22px;
+  background: var(--surface);
+}
+
+.composer textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 13px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.composerActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.composerActions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 42px;
+  padding: 0 14px;
+  font-weight: 700;
+}
+
+.primaryButton {
+  border: 1px solid var(--ink);
+  border-radius: 11px;
+  background: var(--ink);
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.attachmentButton:disabled,
+.notificationButton:disabled,
+.preferenceToggle:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.fileInput {
+  max-width: 260px;
+  font-size: 0.82rem;
+}
+
+.pendingFiles {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.pendingFiles li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 9px 10px;
+  font-size: 0.82rem;
+}
+
+.pendingFiles small {
+  color: var(--muted);
+}
+
+.banner,
+.errorBanner {
+  margin: 12px 0 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.86rem;
+}
+
+.banner {
+  background: color-mix(in srgb, #238565 8%, var(--surface));
+  color: #17694f;
+}
+
+.errorBanner {
+  background: color-mix(in srgb, #c7423a 8%, var(--surface));
+  color: #9a2f29;
+}
+
+.notificationsPanel {
+  padding: clamp(22px, 4vw, 38px);
+}
+
+.notificationsLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.notificationList {
+  display: grid;
+  gap: 10px;
+}
+
+.notificationItem {
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  padding: 14px;
+}
+
+.notificationItem[data-unread="true"] {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.notificationItem p {
+  margin: 7px 0 0;
+  line-height: 1.5;
+}
+
+.notificationMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
+  font-size: 0.76rem;
+}
+
+.notificationButton {
+  margin-top: 10px;
+  padding: 7px 10px;
+}
+
+.preferenceGrid {
+  display: grid;
+  gap: 9px;
+}
+
+.preferenceRow {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.preferenceRow strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.preferenceChannels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.preferenceToggle {
+  padding: 7px 9px;
+  font-size: 0.78rem;
+}
+
+.preferenceToggle[data-enabled="true"] {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+}
+
+.empty {
+  margin: 20px 0 0;
+  line-height: 1.6;
+}
+
+@media (max-width: 880px) {
+  .hero,
+  .notificationsLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .conversationList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .page {
+    width: min(100% - 22px, 1240px);
+    padding-top: 14px;
+  }
+
+  .hero,
+  .workspace,
+  .notificationsPanel {
+    border-radius: 19px;
+  }
+
+  .hero {
+    padding: 24px 20px;
+  }
+
+  .conversationList {
+    grid-template-columns: 1fr;
+  }
+
+  .messageScroller,
+  .threadHeader,
+  .composer {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+  .message {
+    max-width: 90%;
+  }
+
+  .composerActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversationButton,
+  .primaryButton,
+  .secondaryButton {
+    scroll-behavior: auto;
+  }
+}
