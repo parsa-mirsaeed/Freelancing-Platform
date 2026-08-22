@@ -1,0 +1,473 @@
+.milestoneFinance {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.financeHeading,
+.walletHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.financeHeading > div,
+.walletHeading > div {
+  display: grid;
+  gap: 6px;
+}
+
+.financeHeading span,
+.walletHeading span,
+.walletHero span,
+.walletHero aside > span,
+.balanceGrid span,
+.payoutForm label > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 760;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.financeHeading strong {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+}
+
+.financeHeading p,
+.walletHeading > p,
+.authorityNote,
+.loading,
+.emptyWallet p,
+.payoutForm small {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.financeHeading p {
+  max-width: 560px;
+  font-size: 0.84rem;
+  text-align: right;
+}
+
+.financeFacts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.financeFacts div {
+  display: grid;
+  gap: 6px;
+  padding: 15px;
+  border-right: 1px solid var(--border);
+}
+
+.financeFacts div:last-child {
+  border-right: 0;
+}
+
+.financeFacts dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.financeFacts dd {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 740;
+}
+
+.moneyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.moneyActions button,
+.milestoneFinance > button,
+.amountControl button,
+.payoutButton {
+  min-height: 44px;
+  border: 1px solid var(--ink);
+  border-radius: 12px;
+  padding: 0 16px;
+  background: var(--ink);
+  color: white;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 720;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.moneyActions button:hover:not(:disabled),
+.milestoneFinance > button:hover:not(:disabled),
+.amountControl button:hover:not(:disabled),
+.payoutButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.moneyActions button:disabled,
+.amountControl button:disabled,
+.payoutButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.moneyActions button[data-money-action="refund"] {
+  border-color: color-mix(in srgb, #a93631 35%, var(--border));
+  background: transparent;
+  color: #9f302a;
+}
+
+.inlineError,
+.inlineSuccess,
+.walletError,
+.walletSuccess {
+  margin: 0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 0.86rem;
+}
+
+.inlineError,
+.walletError {
+  border: 1px solid color-mix(in srgb, #c7423a 36%, var(--border));
+  background: color-mix(in srgb, #c7423a 8%, var(--surface));
+  color: #9a2f29;
+}
+
+.inlineSuccess,
+.walletSuccess {
+  border: 1px solid color-mix(in srgb, #238565 34%, var(--border));
+  background: color-mix(in srgb, #238565 8%, var(--surface));
+  color: #17694f;
+}
+
+.walletPage {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 34px 0 96px;
+  display: grid;
+  gap: 22px;
+}
+
+.walletHero,
+.walletPanel,
+.walletState {
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  background: var(--surface);
+}
+
+.walletHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.75fr);
+  gap: 28px;
+  padding: clamp(28px, 5vw, 54px);
+  background:
+    radial-gradient(circle at 80% 18%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 32%),
+    linear-gradient(145deg, color-mix(in srgb, var(--ink) 97%, black), var(--ink));
+  color: white;
+}
+
+.walletHero a {
+  color: color-mix(in srgb, white 76%, transparent);
+  font-size: 0.88rem;
+}
+
+.walletHero > div > span {
+  display: block;
+  margin-top: 36px;
+  color: color-mix(in srgb, white 58%, transparent);
+}
+
+.walletHero h1 {
+  margin: 9px 0 16px;
+  font-size: clamp(2.4rem, 6vw, 5.2rem);
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+}
+
+.walletHero > div > p,
+.walletHero aside p {
+  margin: 0;
+  color: color-mix(in srgb, white 70%, transparent);
+  line-height: 1.6;
+}
+
+.walletHero > div > p {
+  max-width: 670px;
+}
+
+.walletHero aside {
+  align-self: end;
+  border: 1px solid color-mix(in srgb, white 14%, transparent);
+  border-radius: 20px;
+  padding: 22px;
+  background: color-mix(in srgb, white 6%, transparent);
+}
+
+.walletHero aside > span {
+  color: color-mix(in srgb, white 58%, transparent);
+}
+
+.walletHero aside strong {
+  display: block;
+  margin: 9px 0 12px;
+  font-size: 1.25rem;
+  text-transform: uppercase;
+}
+
+.walletPanel {
+  padding: clamp(24px, 4vw, 42px);
+}
+
+.walletHeading {
+  margin-bottom: 26px;
+}
+
+.walletHeading h2 {
+  margin: 4px 0 0;
+  font-size: clamp(1.65rem, 3vw, 2.55rem);
+  letter-spacing: -0.035em;
+}
+
+.walletHeading > p {
+  max-width: 560px;
+}
+
+.balanceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.balanceGrid article {
+  display: grid;
+  gap: 8px;
+  min-height: 150px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  background: var(--surface-raised);
+}
+
+.balanceGrid strong {
+  margin-top: auto;
+  font-size: clamp(1.45rem, 3vw, 2.1rem);
+  letter-spacing: -0.035em;
+}
+
+.balanceGrid small {
+  color: var(--muted);
+}
+
+.emptyWallet {
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  padding: 28px;
+}
+
+.emptyWallet strong {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.payoutForm {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.45fr) minmax(260px, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+}
+
+.payoutForm label {
+  display: grid;
+  gap: 8px;
+}
+
+.payoutForm select,
+.payoutForm input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 13px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.amountControl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.amountControl button {
+  border-color: var(--border);
+  background: var(--surface-raised);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.payoutReceipt {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 24px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.payoutReceipt div {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border-right: 1px solid var(--border);
+}
+
+.payoutReceipt div:last-child {
+  border-right: 0;
+}
+
+.payoutReceipt dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.payoutReceipt dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.walletState {
+  width: min(720px, 100%);
+  margin: 60px auto;
+  padding: 36px;
+}
+
+.walletState h1 {
+  margin: 0 0 10px;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  letter-spacing: -0.04em;
+}
+
+.walletState p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.walletState a {
+  display: inline-flex;
+  margin-top: 10px;
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: var(--ink);
+  color: white;
+}
+
+@media (max-width: 840px) {
+  .walletHero,
+  .payoutForm {
+    grid-template-columns: 1fr;
+  }
+
+  .financeHeading,
+  .walletHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .financeHeading p {
+    text-align: left;
+  }
+
+  .financeFacts,
+  .payoutReceipt {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .financeFacts div:nth-child(2),
+  .payoutReceipt div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .financeFacts div:nth-child(-n + 2),
+  .payoutReceipt div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .payoutButton {
+    width: fit-content;
+  }
+}
+
+@media (max-width: 560px) {
+  .walletPage {
+    width: min(100% - 22px, 1120px);
+    padding-top: 14px;
+  }
+
+  .walletHero,
+  .walletPanel,
+  .walletState {
+    border-radius: 20px;
+  }
+
+  .walletHero {
+    padding: 24px 20px;
+  }
+
+  .financeFacts,
+  .payoutReceipt {
+    grid-template-columns: 1fr;
+  }
+
+  .financeFacts div,
+  .financeFacts div:nth-child(2),
+  .payoutReceipt div,
+  .payoutReceipt div:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .financeFacts div:last-child,
+  .payoutReceipt div:last-child {
+    border-bottom: 0;
+  }
+
+  .moneyActions button,
+  .payoutButton {
+    width: 100%;
+  }
+
+  .amountControl {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moneyActions button,
+  .milestoneFinance > button,
+  .amountControl button,
+  .payoutButton {
+    transition: none;
+  }
+}
