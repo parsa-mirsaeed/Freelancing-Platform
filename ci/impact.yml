@@ -249,9 +249,44 @@ domains:
     integration:
       - tests/integration
     flags: [python, database, redis, search, realtime, files, dependencies]
+  frontend:
+    paths:
+      - frontend/src/**
+      - frontend/tests/**
+      - frontend/next.config.ts
+      - frontend/tsconfig.json
+      - frontend/eslint.config.mjs
+      - frontend/vitest.config.ts
+      - frontend/playwright.config.ts
+      - frontend/next-env.d.ts
+      - frontend/.env.example
+      - frontend/package.json
+      - frontend/.npmrc
+      - frontend/package-lock.json
+    frontend_unit:
+      - tests/unit
+    frontend_e2e:
+      - tests/e2e/smoke.spec.ts
+    flags: [frontend, frontend_e2e]
+  frontend-dependencies:
+    paths:
+      - frontend/package.json
+      - frontend/.npmrc
+      - frontend/package-lock.json
+    frontend_unit:
+      - tests/unit
+    frontend_e2e:
+      - tests/e2e/smoke.spec.ts
+    flags: [frontend, frontend_e2e, frontend_dependencies]
   ci:
     paths:
       - ci/**
+      - tests/unit/test_impact.py
+    unit:
+      - tests/unit/test_impact.py
+    flags: [ci, python]
+  workflows:
+    paths:
       - .github/**
     flags: [ci]
   docker:
@@ -267,4 +302,5 @@ domains:
     paths:
       - README.md
       - docs/**
+      - frontend/README.md
     flags: [docs]
