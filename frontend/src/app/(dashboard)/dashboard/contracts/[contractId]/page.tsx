@@ -17,6 +17,11 @@ export default async function ContractPage({ params }: { params: Params }) {
     <>
       <ContractWorkspace contractId={contractId} />
       <ContractMoneyWorkspace contractId={contractId} />
+      <p style={{ width: "min(1180px, calc(100% - 40px))", margin: "0 auto 18px" }}>
+        <Link href={`/dashboard/disputes?contract=${encodeURIComponent(contractId)}`}>
+          Open milestone disputes and evidence →
+        </Link>
+      </p>
       <p style={{ width: "min(1180px, calc(100% - 40px))", margin: "0 auto 90px" }}>
         <Link href={`/dashboard/messages?contract=${encodeURIComponent(contractId)}`}>
           Open private contract messages →

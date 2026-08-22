@@ -4,6 +4,7 @@ import uuid
 
 from flask import Blueprint, g, jsonify, request
 
+from app.disputes.query import list_disputes_for_user, serialize_dispute_case
 from app.disputes.service import (
     add_evidence,
     admin_transition,
@@ -32,11 +33,40 @@ def create_dispute(milestone_id: uuid.UUID):  # type: ignore[no-untyped-def]
     return jsonify(serialize_dispute(dispute)), 201
 
 
+@disputes_bp.get("/disputes")
+@require_access_token
+def list_disputes():  # type: ignore[no-untyped-def]
+    user: User = g.current_user
+    raw_after = request.args.get("after", "").strip()
+    try:
+        after = uuid.UUID(raw_after) if raw_after else None
+        limit = int(request.args.get("limit", "50"))
+    except ValueError as exc:
+        raise ApiError(
+            "validation_error",
+            "Invalid pagination",
+            422,
+            "after must be a UUID and limit must be an integer",
+        ) from exc
+    items, next_after = list_disputes_for_user(
+        user=user,
+        after=after,
+        limit=limit,
+        status=request.args.get("status"),
+    )
+    return jsonify(
+        {
+            "items": [serialize_dispute_case(item) for item in items],
+            "next_after": str(next_after) if next_after else None,
+        }
+    )
+
+
 @disputes_bp.get("/disputes/<uuid:dispute_id>")
 @require_access_token
 def get_dispute(dispute_id: uuid.UUID):  # type: ignore[no-untyped-def]
     user: User = g.current_user
-    return jsonify(serialize_dispute(get_dispute_for_user(user=user, dispute_id=dispute_id)))
+    return jsonify(serialize_dispute_case(get_dispute_for_user(user=user, dispute_id=dispute_id)))
 
 
 @disputes_bp.post("/disputes/<uuid:dispute_id>/evidence")
