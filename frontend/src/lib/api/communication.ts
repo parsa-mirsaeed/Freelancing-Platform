@@ -92,6 +92,11 @@ export function openContractConversation(contractId: string): Promise<Conversati
   return productJson<Conversation>(`contracts/${contractId}/conversation`, { method: "POST" });
 }
 
+export async function openProjectConversation(projectId: string): Promise<Conversation> {
+  const contract = await productJson<{ id: string }>(`projects/${projectId}/contract`);
+  return openContractConversation(contract.id);
+}
+
 export function listMessages(
   conversationId: string,
   after = 0,
