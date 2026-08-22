@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Freelancing Platform Calls API
-  version: 0.7.0
+  version: 0.8.0
 paths:
   /api/v1/calls/ice-servers:
     get:
@@ -13,6 +13,18 @@ paths:
           description: Authentication is required
         '503':
           description: Production TURN configuration is unavailable or invalid
+  /api/v1/conversations/{conversation_id}/call:
+    get:
+      summary: Recover the invited or active one-to-one call visible to a conversation member
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '200':
+          description: Object containing the live call or null when the conversation has no invited/active call
+        '403':
+          description: Caller is not a conversation member
+        '404':
+          description: Conversation was not found
   /api/v1/calls/{call_id}:
     get:
       summary: Read durable call state as one of the two call parties
@@ -27,6 +39,13 @@ paths:
           description: Call was not found
 components:
   parameters:
+    ConversationId:
+      name: conversation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     CallId:
       name: call_id
       in: path
@@ -44,3 +63,4 @@ x-socket-events:
     - call.end
   media-path: peer-to-peer WebRTC
   signaling-persistence: SDP and ICE candidates are never persisted
+  topology: one-to-one only; multi-party conferencing requires an SFU phase

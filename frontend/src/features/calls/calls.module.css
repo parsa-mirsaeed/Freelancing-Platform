@@ -1,0 +1,300 @@
+.page {
+  width: min(1240px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 30px 0 90px;
+  display: grid;
+  gap: 18px;
+}
+
+.hero,
+.workspace {
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+  gap: 28px;
+  padding: clamp(26px, 5vw, 52px);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ink) 97%, black), var(--ink));
+  color: white;
+}
+
+.hero h1 {
+  margin: 9px 0 0;
+  font-size: clamp(2.2rem, 5vw, 4.7rem);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.hero p,
+.callHeader p,
+.empty,
+.notice {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.hero p {
+  color: color-mix(in srgb, white 70%, transparent);
+}
+
+.hero aside {
+  align-self: end;
+  border: 1px solid color-mix(in srgb, white 16%, transparent);
+  border-radius: 18px;
+  padding: 18px;
+  background: color-mix(in srgb, white 6%, transparent);
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 760;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.hero .eyebrow {
+  color: color-mix(in srgb, white 60%, transparent);
+}
+
+.workspace {
+  min-height: 620px;
+  display: grid;
+  grid-template-columns: 310px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.sidebar {
+  padding: 22px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.sidebar h2,
+.callHeader h2 {
+  margin: 7px 0 0;
+  letter-spacing: -0.035em;
+}
+
+.conversationList {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.conversationList button,
+.callActions button {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.conversationList button {
+  width: 100%;
+  padding: 13px;
+  text-align: left;
+}
+
+.conversationList button[aria-current="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.conversationList strong,
+.conversationList span {
+  display: block;
+}
+
+.conversationList span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.callStage {
+  min-width: 0;
+  padding: 24px;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.callHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.callHeader p {
+  margin: 7px 0 0;
+  font-size: 0.86rem;
+}
+
+.transport {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.transport[data-state="live"] {
+  color: #17694f;
+}
+
+.videoGrid {
+  min-height: 380px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.3fr);
+  gap: 12px;
+}
+
+.remoteFrame,
+.localFrame {
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--ink) 95%, black);
+}
+
+.remoteFrame video,
+.localFrame video {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  display: block;
+  object-fit: cover;
+  background: #111;
+}
+
+.remoteFrame span,
+.localFrame span {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: color-mix(in srgb, black 62%, transparent);
+  color: white;
+  font-size: 0.76rem;
+}
+
+.callActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.callActions button {
+  min-height: 42px;
+  padding: 0 14px;
+  font-weight: 700;
+}
+
+.callActions .primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: white;
+}
+
+.callActions .danger {
+  border-color: color-mix(in srgb, #c7423a 48%, var(--border));
+  color: #9a2f29;
+}
+
+.callActions button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.notice {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+}
+
+.banner,
+.errorBanner {
+  margin: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.86rem;
+}
+
+.banner {
+  background: color-mix(in srgb, #238565 8%, var(--surface));
+  color: #17694f;
+}
+
+.errorBanner {
+  background: color-mix(in srgb, #c7423a 8%, var(--surface));
+  color: #9a2f29;
+}
+
+.empty {
+  margin: 18px 0 0;
+}
+
+@media (max-width: 880px) {
+  .hero,
+  .workspace,
+  .videoGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .conversationList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .localFrame {
+    min-height: 180px;
+  }
+}
+
+@media (max-width: 560px) {
+  .page {
+    width: min(100% - 22px, 1240px);
+    padding-top: 14px;
+  }
+
+  .hero,
+  .workspace {
+    border-radius: 19px;
+  }
+
+  .hero,
+  .callStage {
+    padding: 20px;
+  }
+
+  .conversationList {
+    grid-template-columns: 1fr;
+  }
+
+  .callHeader {
+    flex-direction: column;
+  }
+
+  .callActions button {
+    flex: 1 1 140px;
+  }
+}
