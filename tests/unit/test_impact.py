@@ -217,6 +217,26 @@ def test_frontend_contract_change_adds_only_contract_tests() -> None:
     ]
 
 
+def test_frontend_money_change_adds_only_money_tests() -> None:
+    result = calculate(["frontend/src/features/money/wallet-workspace.tsx"], load_config())
+    assert result["domains"] == ["frontend", "frontend-money"]
+    assert result["flags"]["frontend"] is True
+    assert result["flags"]["frontend_e2e"] is True
+    assert result["flags"]["python"] is False
+    assert result["flags"]["database"] is False
+    assert result["flags"]["redis"] is False
+    assert result["flags"]["search"] is False
+    assert result["frontend_unit_targets"] == [
+        "tests/unit/intl.test.ts",
+        "tests/unit/money.test.ts",
+        "tests/unit/proxy-policy.test.ts",
+    ]
+    assert result["frontend_e2e_targets"] == [
+        "tests/e2e/money.spec.ts",
+        "tests/e2e/smoke.spec.ts",
+    ]
+
+
 def test_frontend_dependency_change_adds_audit_without_backend_services() -> None:
     result = calculate(["frontend/package.json"], load_config())
     assert result["domains"] == ["frontend", "frontend-dependencies"]

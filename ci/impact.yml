@@ -331,6 +331,21 @@ domains:
     frontend_e2e:
       - tests/e2e/contracts.spec.ts
     flags: [frontend, frontend_e2e]
+  frontend-money:
+    paths:
+      - frontend/src/app/(dashboard)/dashboard/wallet/**
+      - frontend/src/app/(dashboard)/dashboard/contracts/*/page.tsx
+      - frontend/src/app/(dashboard)/dashboard/projects/*/contract/**
+      - frontend/src/features/money/**
+      - frontend/src/lib/api/money.ts
+      - frontend/src/components/dashboard/dashboard-client.tsx
+      - frontend/tests/unit/money.test.ts
+      - frontend/tests/e2e/money.spec.ts
+    frontend_unit:
+      - tests/unit/money.test.ts
+    frontend_e2e:
+      - tests/e2e/money.spec.ts
+    flags: [frontend, frontend_e2e]
   frontend-dependencies:
     paths:
       - frontend/package.json

@@ -170,14 +170,15 @@ test("freelancer starts a funded milestone and submits durable work progress", a
   });
 
   await signIn(page, "freelancer", `/dashboard/projects/${projectId}/contract`);
-  await expect(page.locator('[data-status="FUNDED"]')).toBeVisible();
-  await page.getByRole("button", { name: "Start work" }).click();
-  await expect(page.locator('[data-status="IN_PROGRESS"]')).toBeVisible();
-  await page.getByLabel("Submission note (optional)").fill("Checkout flow and accessibility evidence attached.");
-  await page.getByRole("button", { name: "Submit work" }).click();
-  await expect(page.locator('[data-status="SUBMITTED"]')).toBeVisible();
-  await expect(page.getByText("Checkout flow and accessibility evidence attached.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Submit work" })).toHaveCount(0);
+  const execution = page.getByLabel("Milestones");
+  await expect(execution.locator('[data-status="FUNDED"]')).toBeVisible();
+  await execution.getByRole("button", { name: "Start work" }).click();
+  await expect(execution.locator('[data-status="IN_PROGRESS"]')).toBeVisible();
+  await execution.getByLabel("Submission note (optional)").fill("Checkout flow and accessibility evidence attached.");
+  await execution.getByRole("button", { name: "Submit work" }).click();
+  await expect(execution.locator('[data-status="SUBMITTED"]')).toBeVisible();
+  await expect(execution.getByText("Checkout flow and accessibility evidence attached.")).toBeVisible();
+  await expect(execution.getByRole("button", { name: "Submit work" })).toHaveCount(0);
 });
 
 test("employer requests changes only with an explicit note", async ({ page }) => {
@@ -220,17 +221,18 @@ test("employer requests changes only with an explicit note", async ({ page }) =>
   });
 
   await signIn(page, "employer", `/dashboard/contracts/${contractId}`);
-  await expect(page.getByRole("button", { name: "Request changes" })).toBeVisible();
-  await page.getByRole("button", { name: "Request changes" }).click();
+  const execution = page.getByLabel("Milestones");
+  await expect(execution.getByRole("button", { name: "Request changes" })).toBeVisible();
+  await execution.getByRole("button", { name: "Request changes" }).click();
   await expect(
     page.getByText("A clear change-request note is required before requesting changes.", { exact: true }),
   ).toBeVisible();
 
-  await page.getByLabel("Change request note").fill(
+  await execution.getByLabel("Change request note").fill(
     "Please add the keyboard-only checkout evidence before approval.",
   );
-  await page.getByRole("button", { name: "Request changes" }).click();
-  await expect(page.locator('[data-status="CHANGES_REQUESTED"]')).toBeVisible();
-  await expect(page.getByRole("button", { name: "Approve work" })).toHaveCount(0);
-  await expect(page.getByText("Please add the keyboard-only checkout evidence before approval.")).toBeVisible();
+  await execution.getByRole("button", { name: "Request changes" }).click();
+  await expect(execution.locator('[data-status="CHANGES_REQUESTED"]')).toBeVisible();
+  await expect(execution.getByRole("button", { name: "Approve work" })).toHaveCount(0);
+  await expect(execution.getByText("Please add the keyboard-only checkout evidence before approval.")).toBeVisible();
 });
