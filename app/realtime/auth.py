@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 
@@ -18,9 +19,19 @@ class SocketPrincipal:
     access_expires_at: datetime
 
 
+def _decode_socket_token(token: str) -> dict[str, Any]:
+    """Prefer scoped realtime tickets while retaining access-token compatibility for API clients."""
+    for token_type in ("realtime", "access"):
+        try:
+            return decode_token(token, expected_type=token_type)
+        except ValueError:
+            continue
+    raise ValueError("Invalid socket token")
+
+
 def authenticate_socket_token(token: str) -> SocketPrincipal | None:
     try:
-        payload = decode_token(token, expected_type="access")
+        payload = _decode_socket_token(token)
         user_id = uuid.UUID(str(payload["sub"]))
         session_id = uuid.UUID(str(payload["sid"]))
         access_expires_at = datetime.fromtimestamp(float(payload["exp"]), tz=UTC)
