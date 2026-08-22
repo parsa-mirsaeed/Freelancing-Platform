@@ -1,0 +1,569 @@
+.page {
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 34px 0 96px;
+  display: grid;
+  gap: 22px;
+}
+
+.hero,
+.documentPanel,
+.signatureSection,
+.milestoneSection {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 26px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.75fr);
+  gap: 28px;
+  padding: clamp(28px, 5vw, 58px);
+  background:
+    radial-gradient(circle at 82% 16%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 32%),
+    linear-gradient(145deg, color-mix(in srgb, var(--ink) 97%, black), var(--ink));
+  color: white;
+  overflow: hidden;
+}
+
+.heroCopy > a {
+  color: color-mix(in srgb, white 76%, transparent);
+  font-size: 0.88rem;
+}
+
+.heroCopy > p,
+.sectionHeading span,
+.scopeGrid span,
+.partyCard span,
+.milestoneCard header span,
+.hashBlock span,
+.statusCard > span,
+.noteField > span {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 760;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.heroCopy > p {
+  margin-top: 38px;
+  color: color-mix(in srgb, white 63%, transparent);
+}
+
+.hero h1 {
+  max-width: 760px;
+  margin: 12px 0 22px;
+  font-size: clamp(2.4rem, 6vw, 5.8rem);
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+}
+
+.heroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.heroMeta span {
+  border: 1px solid color-mix(in srgb, white 18%, transparent);
+  border-radius: 999px;
+  padding: 9px 13px;
+  color: color-mix(in srgb, white 82%, transparent);
+  font-size: 0.84rem;
+}
+
+.statusCard {
+  align-self: end;
+  padding: 22px;
+  border: 1px solid color-mix(in srgb, white 14%, transparent);
+  border-radius: 20px;
+  background: color-mix(in srgb, white 6%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.statusCard > span {
+  color: color-mix(in srgb, white 58%, transparent);
+}
+
+.statusCard strong,
+.milestoneStatusRow > strong {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 12px;
+  border-radius: 999px;
+  padding: 8px 11px;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+}
+
+.statusCard strong {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: white;
+}
+
+.statusCard p {
+  margin: 14px 0 0;
+  color: color-mix(in srgb, white 70%, transparent);
+  line-height: 1.55;
+}
+
+.errorBanner,
+.successBanner {
+  margin: 0;
+  border-radius: 16px;
+  padding: 14px 18px;
+  font-size: 0.92rem;
+}
+
+.errorBanner {
+  border: 1px solid color-mix(in srgb, #c7423a 36%, var(--border));
+  background: color-mix(in srgb, #c7423a 8%, var(--surface));
+  color: #9a2f29;
+}
+
+.successBanner {
+  border: 1px solid color-mix(in srgb, #238565 34%, var(--border));
+  background: color-mix(in srgb, #238565 8%, var(--surface));
+  color: #17694f;
+}
+
+.documentPanel,
+.signatureSection,
+.milestoneSection {
+  padding: clamp(24px, 4vw, 44px);
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.sectionHeading span,
+.scopeGrid span,
+.partyCard span,
+.milestoneCard header span,
+.hashBlock span,
+.noteField > span {
+  color: var(--muted);
+}
+
+.sectionHeading h2 {
+  margin: 5px 0 0;
+  font-size: clamp(1.65rem, 3vw, 2.65rem);
+  letter-spacing: -0.035em;
+}
+
+.sectionHeading > p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.hashBlock {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.hashBlock code {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.scopeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scopeGrid article {
+  min-height: 230px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  background: var(--surface-raised);
+}
+
+.scopeGrid h3 {
+  margin: 30px 0 10px;
+  font-size: 1.35rem;
+  letter-spacing: -0.025em;
+}
+
+.scopeGrid p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.documentFacts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 14px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.documentFacts div {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-right: 1px solid var(--border);
+}
+
+.documentFacts div:last-child {
+  border-right: 0;
+}
+
+.documentFacts dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.documentFacts dd {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 720;
+}
+
+.partyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.partyCard {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.partyCard > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.partyCard p {
+  margin: 24px 0 5px;
+  font-weight: 700;
+}
+
+.partyCard small {
+  color: var(--muted);
+}
+
+.signatureActions,
+.milestoneActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.signatureActions button,
+.milestoneActions button {
+  min-height: 44px;
+  border: 1px solid var(--ink);
+  border-radius: 12px;
+  padding: 0 17px;
+  background: var(--ink);
+  color: white;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 720;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease, background 160ms ease;
+}
+
+.signatureActions button:hover:not(:disabled),
+.milestoneActions button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.signatureActions button:disabled,
+.milestoneActions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.signatureActions .dangerButton {
+  border-color: color-mix(in srgb, #a93631 35%, var(--border));
+  background: transparent;
+  color: #9f302a;
+}
+
+.signedNote {
+  align-self: center;
+  color: #17694f;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.milestoneList {
+  display: grid;
+  gap: 14px;
+}
+
+.milestoneCard {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: clamp(20px, 3vw, 30px);
+  background: var(--surface-raised);
+}
+
+.milestoneCard header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.milestoneCard h3 {
+  margin: 7px 0 0;
+  font-size: clamp(1.25rem, 2.5vw, 1.85rem);
+  letter-spacing: -0.025em;
+}
+
+.milestoneCommercial {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+
+.milestoneCommercial strong {
+  font-size: 1.05rem;
+}
+
+.milestoneCommercial span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.milestoneStatusRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 14px;
+  margin-top: 22px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.milestoneStatusRow > strong {
+  margin: 0;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--ink);
+}
+
+.milestoneStatusRow p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.timeline {
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline li {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 12px;
+  min-height: 62px;
+}
+
+.timeline li > span {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.timeline li > span::after {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: 4px;
+  width: 1px;
+  height: 46px;
+  background: var(--border);
+}
+
+.timeline li:last-child > span::after {
+  display: none;
+}
+
+.timeline div {
+  display: grid;
+  gap: 3px;
+}
+
+.timeline small,
+.emptyHistory {
+  color: var(--muted);
+}
+
+.timeline p,
+.emptyHistory {
+  margin: 5px 0 0;
+  line-height: 1.55;
+}
+
+.noteField {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.noteField textarea {
+  width: 100%;
+  min-height: 104px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 13px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.loading,
+.accessState {
+  width: min(760px, calc(100% - 40px));
+  margin: 90px auto;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 36px;
+  background: var(--surface);
+}
+
+.loading {
+  color: var(--muted);
+}
+
+.accessState h1 {
+  margin: 0 0 10px;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  letter-spacing: -0.04em;
+}
+
+.accessState p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.accessState a {
+  display: inline-flex;
+  margin-top: 12px;
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: var(--ink);
+  color: white;
+}
+
+@media (max-width: 860px) {
+  .hero,
+  .scopeGrid,
+  .partyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .documentFacts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .documentFacts div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .documentFacts div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sectionHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .hashBlock {
+    justify-items: start;
+  }
+}
+
+@media (max-width: 560px) {
+  .page {
+    width: min(100% - 22px, 1180px);
+    padding-top: 14px;
+  }
+
+  .hero,
+  .documentPanel,
+  .signatureSection,
+  .milestoneSection {
+    border-radius: 20px;
+  }
+
+  .hero {
+    padding: 24px 20px;
+  }
+
+  .heroCopy > p {
+    margin-top: 30px;
+  }
+
+  .documentFacts {
+    grid-template-columns: 1fr;
+  }
+
+  .documentFacts div,
+  .documentFacts div:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .documentFacts div:last-child {
+    border-bottom: 0;
+  }
+
+  .milestoneCard header,
+  .milestoneStatusRow {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .milestoneCommercial {
+    justify-items: start;
+  }
+
+  .signatureActions button,
+  .milestoneActions button {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signatureActions button,
+  .milestoneActions button {
+    transition: none;
+  }
+}

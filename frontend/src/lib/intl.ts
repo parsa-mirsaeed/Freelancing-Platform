@@ -72,3 +72,5 @@ export function formatDateTime(
     timeZone,
   }).format(date);
 }
+
+export const formatShortDateTime = formatDateTime;

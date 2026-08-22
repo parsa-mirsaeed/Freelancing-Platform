@@ -318,6 +318,19 @@ domains:
     frontend_e2e:
       - tests/e2e/proposals.spec.ts
     flags: [frontend, frontend_e2e]
+  frontend-contracts:
+    paths:
+      - frontend/src/app/(dashboard)/dashboard/contracts/**
+      - frontend/src/app/(dashboard)/dashboard/projects/*/contract/**
+      - frontend/src/features/contracts/**
+      - frontend/src/lib/api/contracts.ts
+      - frontend/tests/unit/contracts.test.ts
+      - frontend/tests/e2e/contracts.spec.ts
+    frontend_unit:
+      - tests/unit/contracts.test.ts
+    frontend_e2e:
+      - tests/e2e/contracts.spec.ts
+    flags: [frontend, frontend_e2e]
   frontend-dependencies:
     paths:
       - frontend/package.json
