@@ -1,0 +1,55 @@
+.page { min-height: 100vh; padding: 7rem 1.5rem 6rem; background: #f4f6f2; color: #102019; }
+.hero { display: flex; justify-content: space-between; gap: 2rem; align-items: flex-end; width: min(1080px,100%); margin: 0 auto 2rem; }
+.hero > div { max-width: 760px; }
+.hero a { color: #4b6859; font-size: .8rem; text-decoration: none; }
+.hero span { display: block; margin-top: 2rem; color: #2f7451; font-size: .72rem; font-weight: 760; letter-spacing: .13em; text-transform: uppercase; }
+.hero h1 { margin: .65rem 0 1rem; font-size: clamp(2.45rem,5vw,4.7rem); line-height: 1; letter-spacing: -.055em; font-weight: 590; }
+.hero p { max-width: 720px; margin: 0; color: #607067; line-height: 1.7; }
+.publicLink { flex: none; padding: .78rem 1rem; border: 1px solid #cbd7cf; border-radius: .8rem; background: #fff; color: #194d34 !important; font-weight: 690; }
+.workspace { display: grid; gap: 1.25rem; width: min(1080px,100%); margin: 0 auto; }
+.formSection { padding: clamp(1.25rem,3vw,2rem); border: 1px solid #d7e0d9; border-radius: 1.35rem; background: #fff; box-shadow: 0 10px 35px rgba(28,53,39,.035); }
+.sectionTitle { display: grid; grid-template-columns: minmax(220px,.8fr) minmax(280px,1fr); gap: 2rem; padding-bottom: 1.4rem; margin-bottom: 1.5rem; border-bottom: 1px solid #e6ebe7; }
+.sectionTitle span { color: #347451; font-size: .7rem; font-weight: 760; letter-spacing: .12em; text-transform: uppercase; }
+.sectionTitle h2 { margin: .3rem 0 0; font-size: 1.55rem; letter-spacing: -.035em; }
+.sectionTitle p { margin: 0; color: #69776f; font-size: .82rem; line-height: 1.6; }
+.fieldGrid,.exceptionGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
+.fieldGrid label,.portfolioForm label,.exceptionGrid label { display: grid; gap: .46rem; }
+.fieldGrid label > span,.portfolioForm label > span,.exceptionGrid label > span { font-size: .76rem; font-weight: 700; color: #35483e; }
+.fullField { grid-column: 1/-1; }
+.fieldGrid input,.fieldGrid textarea,.portfolioForm input,.portfolioForm textarea,.exceptionGrid input,.ruleRow input,.ruleRow select { width: 100%; border: 1px solid #cfd9d2; border-radius: .78rem; background: #fbfcfb; color: #102019; font: inherit; outline: none; }
+.fieldGrid input,.portfolioForm input,.exceptionGrid input,.ruleRow input,.ruleRow select { min-height: 2.85rem; padding: 0 .82rem; }
+.fieldGrid textarea,.portfolioForm textarea { padding: .78rem .82rem; resize: vertical; }
+.fieldGrid input:focus-visible,.fieldGrid textarea:focus-visible,.portfolioForm input:focus-visible,.portfolioForm textarea:focus-visible,.exceptionGrid input:focus-visible,.ruleRow input:focus-visible,.ruleRow select:focus-visible { border-color: #2a7750; box-shadow: 0 0 0 3px rgba(42,119,80,.13); }
+.fieldGrid small { color: #7b8780; font-size: .68rem; }
+.switchField { align-content: end; }
+.switchRow { display: flex !important; align-items: center; gap: .55rem; min-height: 2.85rem; font-size: .78rem !important; font-weight: 560 !important; }
+.switchRow input { width: 1.05rem !important; min-height: auto !important; height: 1.05rem; accent-color: #197247; }
+.formActions,.inlineActions { display: flex; align-items: center; gap: 1rem; margin-top: 1.3rem; }
+.formActions button,.inlineActions button,.exceptionForm > button,.portfolioForm > button,.roleState button { min-height: 2.85rem; padding: 0 1rem; border: 0; border-radius: .78rem; background: #0e2b1e; color: #f5fff8; font: inherit; font-size: .78rem; font-weight: 730; cursor: pointer; }
+.formActions button:disabled,.inlineActions button:disabled { opacity: .55; cursor: wait; }
+.successText,.errorText { min-height: 1.2rem; margin: 0; font-size: .75rem; }
+.successText { color: #2b6f4c; }.errorText { color: #a23232; }
+.onboarding { width: min(1080px,100%); margin: 0 auto 1.25rem; padding: 1rem 1.2rem; border: 1px solid #d2dfd6; border-radius: 1rem; background: #eaf4ed; }
+.onboarding strong { font-size: .86rem; }.onboarding p { margin: .35rem 0 0; color: #5d6f64; font-size: .76rem; }
+.ruleList { display: grid; gap: .55rem; }
+.ruleRow { display: grid; grid-template-columns: 1.15fr .8fr auto .8fr 1.2fr auto; gap: .55rem; align-items: center; }
+.ruleRow > span { color: #7a857f; font-size: .72rem; }
+.quietButton,.secondaryButton,.dangerButton { min-height: 2.45rem !important; padding: 0 .72rem !important; border: 1px solid #d1dbd4 !important; background: #fff !important; color: #405348 !important; font-size: .72rem !important; }
+.secondaryButton { color: #1e633f !important; }.dangerButton { border-color: #e8c4c4 !important; background: #fff7f7 !important; color: #9b2c2c !important; }
+.exceptionForm { margin-top: 1.8rem; padding-top: 1.5rem; border-top: 1px solid #e7ece8; }
+.exceptionForm h3 { margin: 0 0 1rem; font-size: 1rem; }
+.exceptionForm > button { margin-top: 1rem; }
+.exceptionList { display: grid; margin-top: 1.2rem; border-top: 1px solid #edf1ee; }
+.exceptionList > div { display: grid; grid-template-columns: 120px 140px 1fr; gap: 1rem; padding: .72rem 0; border-bottom: 1px solid #edf1ee; font-size: .72rem; }
+.exceptionList time,.exceptionList span { color: #6b7970; }.exceptionList strong { font-weight: 690; }
+.portfolioForm { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding-bottom: 1.5rem; border-bottom: 1px solid #e8ede9; }
+.portfolioForm > button { justify-self: start; }
+.portfolioList { display: grid; gap: .7rem; margin-top: 1.25rem; }
+.portfolioList article { display: flex; justify-content: space-between; gap: 1.5rem; padding: 1rem; border: 1px solid #e0e6e2; border-radius: .9rem; }
+.portfolioList h3 { margin: 0; font-size: .9rem; }.portfolioList p { max-width: 650px; margin: .4rem 0; color: #647269; font-size: .76rem; line-height: 1.55; }.portfolioList a { color: #276b49; font-size: .72rem; }
+.removeArea { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; justify-content: flex-end; }.removeArea span { color: #8a5555; font-size: .7rem; }
+.emptyText { color: #78847d; font-size: .78rem; }
+.loading,.roleState { width: min(720px,calc(100% - 2rem)); margin: 5rem auto; padding: 2rem; border: 1px solid #d9e1db; border-radius: 1.2rem; background: #fff; }
+.loading { color: #637269; text-align: center; }.roleState span { color: #32734f; font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; }.roleState h1 { margin: .5rem 0; font-size: 2rem; }.roleState p { color: #637269; line-height: 1.6; }.roleState a { color: #22633f; font-weight: 690; }
+@media(max-width:800px){.sectionTitle{grid-template-columns:1fr;gap:.5rem}.ruleRow{grid-template-columns:1fr 1fr}.ruleRow>span{display:none}.ruleRow .quietButton{justify-self:start}.portfolioForm{grid-template-columns:1fr}.hero{align-items:flex-start;flex-direction:column}.publicLink{align-self:flex-start}.exceptionList>div{grid-template-columns:1fr 1fr}.exceptionList span{grid-column:1/-1}}
+@media(max-width:560px){.page{padding:6.5rem 1rem 4rem}.fieldGrid,.exceptionGrid{grid-template-columns:1fr}.fullField{grid-column:auto}.ruleRow{grid-template-columns:1fr}.formActions,.inlineActions{align-items:flex-start;flex-direction:column}.portfolioList article{flex-direction:column}.removeArea{justify-content:flex-start}}
