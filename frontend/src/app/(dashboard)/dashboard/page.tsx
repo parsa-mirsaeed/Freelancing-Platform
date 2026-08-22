@@ -19,6 +19,7 @@ export default function DashboardPage() {
       >
         <Link href="/dashboard/disputes">Open dispute cases and arbitration queue →</Link>
         <Link href="/dashboard/calls">Open voice, video, and screen-sharing calls →</Link>
+        <Link href="/dashboard/ai">Open explainable AI assistance →</Link>
       </div>
     </>
   );

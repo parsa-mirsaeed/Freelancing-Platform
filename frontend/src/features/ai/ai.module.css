@@ -1,0 +1,374 @@
+.shell {
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 56px 0 96px;
+  display: grid;
+  gap: 28px;
+}
+
+.hero,
+.section {
+  border: 1px solid var(--line, #d9d9d9);
+  border-radius: 24px;
+  background: var(--white, #fff);
+}
+
+.hero {
+  padding: 34px;
+  display: flex;
+  justify-content: space-between;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.hero h1 {
+  margin: 6px 0 12px;
+  max-width: 760px;
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: .98;
+}
+
+.hero p,
+.sectionHeading p,
+.contextLine,
+.guardrail {
+  color: var(--muted, #666);
+  line-height: 1.65;
+}
+
+.eyebrow,
+.kicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.backLink {
+  white-space: nowrap;
+}
+
+.section {
+  padding: 30px;
+  display: grid;
+  gap: 22px;
+}
+
+.sectionHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: end;
+}
+
+.sectionHeading h2,
+.adminPanel h3,
+.queueHeader h3 {
+  margin: 4px 0 0;
+}
+
+.sectionHeading p {
+  margin: 0;
+  max-width: 520px;
+}
+
+.projectControls,
+.queueHeader,
+.reviewControls,
+.riskTop,
+.matchTop {
+  display: flex;
+  gap: 14px;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.projectControls label,
+.adminPanel label,
+.queueHeader label,
+.reviewControls label {
+  display: grid;
+  gap: 7px;
+  font-size: .86rem;
+  font-weight: 650;
+}
+
+.projectControls label {
+  flex: 1;
+}
+
+.projectControls select,
+.adminPanel input,
+.adminPanel textarea,
+.queueHeader select,
+.reviewControls input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line, #cfcfcf);
+  border-radius: 12px;
+  padding: 11px 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.projectControls button,
+.sectionHeading button,
+.adminPanel button,
+.reviewControls button,
+.secondaryButton {
+  border-radius: 999px;
+  padding: 11px 17px;
+  background: var(--ink, #111);
+  color: var(--white, #fff);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.projectControls button:disabled,
+.sectionHeading button:disabled,
+.adminPanel button:disabled,
+.reviewControls button:disabled,
+.secondaryButton:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.secondaryButton,
+.reviewControls .secondaryButton {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--line, #cfcfcf);
+}
+
+.notice,
+.error,
+.guardrail {
+  margin: 0;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line, #d9d9d9);
+}
+
+.error {
+  border-color: #b54a4a;
+}
+
+.priceCard {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 20px;
+  border: 1px solid var(--line, #d9d9d9);
+}
+
+.priceCard > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.priceCard > div:first-child strong {
+  font-size: clamp(1.45rem, 3vw, 2.3rem);
+}
+
+.priceCard dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.priceCard dl div,
+.featureGrid div {
+  display: grid;
+  gap: 4px;
+}
+
+.priceCard dt,
+.featureGrid span,
+.priceCard small,
+.riskCard small,
+.modelList small {
+  color: var(--muted, #666);
+  font-size: .78rem;
+}
+
+.priceCard dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.runMeta,
+.reasonList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.runMeta span,
+.reasonList span {
+  border: 1px solid var(--line, #d9d9d9);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: .75rem;
+}
+
+.recommendationBlock {
+  display: grid;
+  gap: 16px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.matchCard,
+.skillList article,
+.modelList article,
+.riskCard {
+  border: 1px solid var(--line, #d9d9d9);
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.matchCard {
+  display: grid;
+  gap: 14px;
+}
+
+.rank {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line, #d9d9d9);
+}
+
+.candidateId {
+  margin: 0;
+  color: var(--muted, #666);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .85rem;
+}
+
+.matchCard ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.skillList,
+.modelList,
+.riskList {
+  display: grid;
+  gap: 12px;
+}
+
+.skillList article,
+.modelList article {
+  display: grid;
+  gap: 6px;
+}
+
+.skillList article > div,
+.modelList article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.adminGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.adminPanel {
+  border: 1px solid var(--line, #d9d9d9);
+  border-radius: 20px;
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.riskCard {
+  display: grid;
+  gap: 13px;
+}
+
+.riskTop div {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.riskTop span {
+  font-size: .75rem;
+  font-weight: 800;
+}
+
+.riskCard p {
+  margin: 0;
+}
+
+.riskCard details {
+  border-top: 1px solid var(--line, #e0e0e0);
+  padding-top: 10px;
+}
+
+.riskCard pre {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  font-size: .78rem;
+}
+
+.reviewControls {
+  align-items: end;
+}
+
+.reviewControls label {
+  flex: 1;
+}
+
+.reviewControls > div {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 780px) {
+  .shell {
+    width: min(100% - 24px, 1180px);
+    padding-top: 24px;
+  }
+
+  .hero,
+  .sectionHeading,
+  .projectControls,
+  .queueHeader,
+  .reviewControls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero,
+  .section {
+    padding: 22px;
+  }
+
+  .cards,
+  .adminGrid,
+  .priceCard dl,
+  .featureGrid {
+    grid-template-columns: 1fr;
+  }
+}
