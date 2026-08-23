@@ -1,0 +1,102 @@
+openapi: 3.1.0
+info:
+  title: Freelancing Platform Identity Security API
+  version: 0.1.0
+paths:
+  /api/v1/auth/mfa:
+    get:
+      summary: Read MFA enrollment and current-session step-up status
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: MFA status for the authenticated account and session
+        "401":
+          $ref: "#/components/responses/ApiError"
+  /api/v1/auth/mfa/totp/enroll:
+    post:
+      summary: Start TOTP enrollment after current-password confirmation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: TOTP secret and otpauth provisioning URI
+        "401":
+          $ref: "#/components/responses/ApiError"
+        "409":
+          $ref: "#/components/responses/ApiError"
+  /api/v1/auth/mfa/totp/confirm:
+    post:
+      summary: Confirm TOTP enrollment and issue one-time recovery codes
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaCodeRequest"
+      responses:
+        "200":
+          description: MFA enabled and recovery codes returned once
+        "409":
+          $ref: "#/components/responses/ApiError"
+        "422":
+          $ref: "#/components/responses/ApiError"
+  /api/v1/auth/mfa/verify:
+    post:
+      summary: Step up the current session with TOTP or one unused recovery code
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaCodeRequest"
+      responses:
+        "200":
+          description: Current session has fresh MFA verification
+        "401":
+          $ref: "#/components/responses/ApiError"
+        "403":
+          $ref: "#/components/responses/ApiError"
+  /api/v1/auth/mfa/assert:
+    post:
+      summary: Assert that the current session has fresh MFA verification
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Session MFA step-up is fresh
+        "403":
+          $ref: "#/components/responses/ApiError"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    MfaCodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          minLength: 6
+          maxLength: 64
+  responses:
+    ApiError:
+      description: Standard API error
