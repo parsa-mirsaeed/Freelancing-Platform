@@ -21,6 +21,7 @@ from app.identity.mfa import (
     verify_totp,
 )
 from app.identity.models import User, UserDevice, UserRole, UserSession, UserVerification
+from app.identity.pii import current_pii_cipher
 from app.identity.security import (
     decode_token,
     hash_jti,
@@ -32,6 +33,7 @@ from app.identity.settings import auth_lock_seconds, auth_max_failed_attempts
 
 ALLOWED_SELF_SERVICE_ROLES = {"freelancer", "employer"}
 MFA_RECOVERY_KIND = "mfa_recovery"
+_EMAIL_CONTEXT = "user.email"
 _DUMMY_PASSWORD_HASH: str | None = None
 
 
@@ -64,7 +66,8 @@ def register_user(
         raise ApiError(
             "validation_error", "Invalid role", 422, "Role must be freelancer or employer"
         )
-    if db.session.scalar(select(User.id).where(User.email == normalized_email)) is not None:
+    lookup_hash = _email_lookup_hash(normalized_email)
+    if db.session.scalar(select(User.id).where(User.email_lookup_hash == lookup_hash)) is not None:
         raise ApiError(
             "email_in_use", "Email unavailable", 409, "An account already uses this email"
         )
@@ -74,7 +77,8 @@ def register_user(
     except ValueError as exc:
         raise ApiError("validation_error", "Invalid password", 422, str(exc)) from exc
 
-    user = User(email=normalized_email, password_hash=password_hash)
+    user = User(password_hash=password_hash)
+    user.email = normalized_email
     user.roles.append(UserRole(role=role))
     db.session.add(user)
     try:
@@ -100,7 +104,11 @@ def login_user(
     *, email: str, password: str, context: ClientContext | None = None
 ) -> tuple[User, str, str]:
     normalized_email = email.strip().lower()
-    user = db.session.scalar(select(User).where(User.email == normalized_email).with_for_update())
+    user = db.session.scalar(
+        select(User)
+        .where(User.email_lookup_hash == _email_lookup_hash(normalized_email))
+        .with_for_update()
+    )
     password_ok = verify_password(
         user.password_hash if user is not None else _dummy_password_hash(), password
     )
@@ -125,13 +133,14 @@ def login_user(
 
     user.failed_login_attempts = 0
     user.locked_until = None
+    pii_key_rotated = user.rotate_email_encryption_if_needed()
     access, refresh, new_device = _create_session(user, context)
     record_audit_event(
         action="identity.login_succeeded",
         resource_type="user",
         resource_id=str(user.id),
         actor_user_id=user.id,
-        metadata={"new_device": new_device},
+        metadata={"new_device": new_device, "pii_key_rotated": pii_key_rotated},
     )
     if new_device:
         _record_login_risk(user, context, reason="new_device")
@@ -405,6 +414,10 @@ def _hash_optional(value: str | None) -> str | None:
     if not value:
         return None
     return hashlib.sha256(value.encode()).hexdigest()
+
+
+def _email_lookup_hash(normalized_email: str) -> str:
+    return current_pii_cipher().blind_index(normalized_email, context=_EMAIL_CONTEXT)
 
 
 def _normalize_email(email: str) -> str:

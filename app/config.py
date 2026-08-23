@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
 import os
 from dataclasses import dataclass
 
@@ -23,6 +26,44 @@ def _comma_list(value: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(",") if item.strip())
 
 
+def _derived_local_key(secret_key: str, *, purpose: str) -> str:
+    material = hashlib.sha256(f"{purpose}\0{secret_key}".encode()).digest()
+    return base64.urlsafe_b64encode(material).decode("ascii").rstrip("=")
+
+
+def _validate_base64_key(name: str, value: str) -> None:
+    try:
+        padding = "=" * (-len(value) % 4)
+        decoded = base64.b64decode((value + padding).encode("ascii"), altchars=b"-_", validate=True)
+    except (UnicodeEncodeError, binascii.Error, ValueError) as exc:
+        raise RuntimeError(f"{name} must be URL-safe base64") from exc
+    if len(decoded) != 32:
+        raise RuntimeError(f"{name} must decode to exactly 32 bytes")
+
+
+def _validate_pii_encryption_keys(value: str) -> None:
+    entries = _comma_list(value)
+    if not entries:
+        raise RuntimeError("PII_ENCRYPTION_KEYS must contain at least one key")
+    seen: set[str] = set()
+    for entry in entries:
+        key_id, separator, encoded_key = entry.partition(":")
+        if (
+            not separator
+            or not key_id
+            or len(key_id) > 40
+            or not key_id.isascii()
+            or any(not (char.isalnum() or char in "._-") for char in key_id)
+        ):
+            raise RuntimeError(
+                "PII_ENCRYPTION_KEYS entries must use ASCII key-id:base64-key format"
+            )
+        if key_id in seen:
+            raise RuntimeError(f"PII_ENCRYPTION_KEYS contains duplicate key id: {key_id}")
+        seen.add(key_id)
+        _validate_base64_key(f"PII encryption key {key_id}", encoded_key)
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     environment: str
@@ -33,6 +74,8 @@ class Settings:
     elasticsearch_index_prefix: str
     access_token_ttl_seconds: int
     refresh_token_ttl_seconds: int
+    pii_encryption_keys: str
+    pii_lookup_key: str
     max_content_length: int
     cors_allowed_origins: tuple[str, ...]
     rate_limit_enabled: bool
@@ -51,12 +94,28 @@ class Settings:
             name: int(os.getenv(f"FEATURE_FLAG_{name.upper()}_PERCENT", "0"))
             for name in FEATURE_FLAG_NAMES
         }
+        pii_encryption_keys = os.getenv("PII_ENCRYPTION_KEYS", "").strip()
+        pii_lookup_key = os.getenv("PII_LOOKUP_KEY", "").strip()
 
         if environment == "production":
             if secret_key == "development-only-change-me":
                 raise RuntimeError("SECRET_KEY must be configured in production")
             if "*" in cors_allowed_origins:
                 raise RuntimeError("CORS_ALLOWED_ORIGINS cannot contain '*' in production")
+            if not pii_encryption_keys:
+                raise RuntimeError("PII_ENCRYPTION_KEYS must be configured in production")
+            if not pii_lookup_key:
+                raise RuntimeError("PII_LOOKUP_KEY must be configured in production")
+        else:
+            if not pii_encryption_keys:
+                pii_encryption_keys = "local-v1:" + _derived_local_key(
+                    secret_key, purpose="pii-encryption-local-v1"
+                )
+            if not pii_lookup_key:
+                pii_lookup_key = _derived_local_key(secret_key, purpose="pii-lookup-local-v1")
+
+        _validate_pii_encryption_keys(pii_encryption_keys)
+        _validate_base64_key("PII_LOOKUP_KEY", pii_lookup_key)
         if max_content_length <= 0:
             raise RuntimeError("MAX_CONTENT_LENGTH must be positive")
         if rate_limit_per_minute <= 0:
@@ -78,6 +137,8 @@ class Settings:
             ),
             access_token_ttl_seconds=int(os.getenv("ACCESS_TOKEN_TTL_SECONDS", "900")),
             refresh_token_ttl_seconds=int(os.getenv("REFRESH_TOKEN_TTL_SECONDS", "2592000")),
+            pii_encryption_keys=pii_encryption_keys,
+            pii_lookup_key=pii_lookup_key,
             max_content_length=max_content_length,
             cors_allowed_origins=cors_allowed_origins,
             rate_limit_enabled=_env_bool(
@@ -100,6 +161,8 @@ class Settings:
             "ELASTICSEARCH_INDEX_PREFIX": self.elasticsearch_index_prefix,
             "ACCESS_TOKEN_TTL_SECONDS": self.access_token_ttl_seconds,
             "REFRESH_TOKEN_TTL_SECONDS": self.refresh_token_ttl_seconds,
+            "PII_ENCRYPTION_KEYS": self.pii_encryption_keys,
+            "PII_LOOKUP_KEY": self.pii_lookup_key,
             "MAX_CONTENT_LENGTH": self.max_content_length,
             "CORS_ALLOWED_ORIGINS": self.cors_allowed_origins,
             "RATE_LIMIT_ENABLED": self.rate_limit_enabled,

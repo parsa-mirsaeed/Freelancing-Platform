@@ -9,7 +9,7 @@ A skill-sharing and freelancing marketplace built as a domain-driven modular Fla
 - Flask application factory and domain-oriented packages.
 - PostgreSQL persistence through SQLAlchemy 2 and Alembic.
 - Redis extension and Celery application factory.
-- Identity foundation with Argon2 password hashing, access tokens, rotating database-backed refresh sessions, and freelancer/employer self-registration.
+- Identity foundation with Argon2 password hashing, access tokens, rotating database-backed refresh sessions, encrypted email PII with keyed blind-index lookup, and freelancer/employer self-registration.
 - RBAC helpers plus resource-ownership policy seams.
 - Immutable audit events and dependency-aware health endpoints.
 - OpenAPI 3.1, non-root containerization, and impact-based PR CI.
@@ -73,6 +73,28 @@ export ELASTICSEARCH_INDEX_PREFIX='freelancing-development'
 export SECRET_KEY='replace-this-local-secret'
 alembic upgrade head
 ```
+
+Development/test environments derive deterministic local PII keys from `SECRET_KEY` when explicit keys are absent. Production must instead supply two independent secret values: an ordered AES-256-GCM keyring and a separate blind-index HMAC key. Generate 32-byte base64 values with a secrets-capable tool; one Python option is:
+
+```bash
+python - <<'PY'
+import base64
+import secrets
+
+for name in ("PII_ENCRYPTION_KEY", "PII_LOOKUP_KEY"):
+    value = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
+    print(f"{name}={value}")
+PY
+```
+
+Then place them in the deployment secret store, for example:
+
+```bash
+export PII_ENCRYPTION_KEYS='2026-08:<PII_ENCRYPTION_KEY>'
+export PII_LOOKUP_KEY='<PII_LOOKUP_KEY>'
+```
+
+To rotate the encryption key, prepend a new `key-id:key` entry and retain old keys while referenced ciphertext or rollback may still require them. Rotating `PII_LOOKUP_KEY` is a separate coordinated data migration because it changes every lookup hash. See `docs/identity-security.md` before production rotation or rollback.
 
 The default local Money adapter is `sandbox`. Override these only when needed:
 
