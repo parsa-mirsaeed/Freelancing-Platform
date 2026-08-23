@@ -6,10 +6,16 @@ from sqlalchemy import select
 from app.extensions import db
 from app.identity.mfa import totp_code_for_secret
 from app.identity.models import User, UserDevice, UserRole
+from app.identity.pii import current_pii_cipher
 
 pytestmark = pytest.mark.unit
 
 PASSWORD = "correct horse battery staple"
+_EMAIL_CONTEXT = "user.email"
+
+
+def _email_lookup_hash(email: str) -> str:
+    return current_pii_cipher().blind_index(email.strip().lower(), context=_EMAIL_CONTEXT)
 
 
 def _register(client, *, email: str = "secure@example.com", role: str = "freelancer") -> dict:
@@ -125,7 +131,9 @@ def test_failed_login_lock_is_generic_and_recovers_after_window(
     assert locked.status_code == 401
     assert locked.get_json()["type"] == "invalid_credentials"
 
-    user = db.session.scalar(select(User).where(User.email == "secure@example.com"))
+    user = db.session.scalar(
+        select(User).where(User.email_lookup_hash == _email_lookup_hash("secure@example.com"))
+    )
     assert user is not None and user.locked_until is not None
     user.locked_until = datetime.now(UTC) - timedelta(seconds=1)
     db.session.commit()
@@ -146,7 +154,9 @@ def test_device_registry_deduplicates_and_detects_new_devices(
 
 def test_admin_routes_require_fresh_mfa(client) -> None:  # type: ignore[no-untyped-def]
     registered = _register(client, email="admin@example.com", role="employer")
-    user = db.session.scalar(select(User).where(User.email == "admin@example.com"))
+    user = db.session.scalar(
+        select(User).where(User.email_lookup_hash == _email_lookup_hash("admin@example.com"))
+    )
     assert user is not None
     user.roles.append(UserRole(role="admin"))
     db.session.commit()

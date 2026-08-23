@@ -7,13 +7,18 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueCon
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
+from app.identity.pii import current_pii_cipher
+
+_EMAIL_CONTEXT = "user.email"
 
 
 class User(db.Model):  # type: ignore[name-defined,misc]
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("email_lookup_hash", name="uq_users_email_lookup_hash"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
+    _email_ciphertext: Mapped[str] = mapped_column("email_ciphertext", String(1024), nullable=False)
+    email_lookup_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     failed_login_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -42,6 +47,24 @@ class User(db.Model):  # type: ignore[name-defined,misc]
     verifications: Mapped[list[UserVerification]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+
+    @property
+    def email(self) -> str:
+        return current_pii_cipher().decrypt(self._email_ciphertext, context=_EMAIL_CONTEXT)
+
+    @email.setter
+    def email(self, value: str) -> None:
+        normalized = value.strip().lower()
+        cipher = current_pii_cipher()
+        self._email_ciphertext = cipher.encrypt(normalized, context=_EMAIL_CONTEXT)
+        self.email_lookup_hash = cipher.blind_index(normalized, context=_EMAIL_CONTEXT)
+
+    def rotate_email_encryption_if_needed(self) -> bool:
+        cipher = current_pii_cipher()
+        if not cipher.needs_rotation(self._email_ciphertext):
+            return False
+        self._email_ciphertext = cipher.rewrap(self._email_ciphertext, context=_EMAIL_CONTEXT)
+        return True
 
 
 class UserRole(db.Model):  # type: ignore[name-defined,misc]

@@ -5,16 +5,18 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from app import create_app
 from app.extensions import db
 from app.identity.mfa import totp_code_for_secret
 from app.identity.models import User, UserDevice, UserVerification
+from app.identity.pii import current_pii_cipher
 
 pytestmark = pytest.mark.db
 
 PASSWORD = "correct horse battery staple"
+_EMAIL_CONTEXT = "user.email"
 
 
 def _app():  # type: ignore[no-untyped-def]
@@ -36,6 +38,10 @@ def _app():  # type: ignore[no-untyped-def]
 
 def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def _email_lookup_hash(email: str) -> str:
+    return current_pii_cipher().blind_index(email.strip().lower(), context=_EMAIL_CONTEXT)
 
 
 def test_mfa_step_up_recovery_and_device_state_persist_on_postgres() -> None:
@@ -94,8 +100,22 @@ def test_mfa_step_up_recovery_and_device_state_persist_on_postgres() -> None:
         )
 
     with app.app_context():
-        user = db.session.scalar(select(User).where(User.email == email))
+        user = db.session.scalar(
+            select(User).where(User.email_lookup_hash == _email_lookup_hash(email))
+        )
         assert user is not None and user.mfa_enabled_at is not None
+        assert user.email == email
+        raw = (
+            db.session.execute(
+                text("SELECT email_ciphertext, email_lookup_hash FROM users WHERE id = :user_id"),
+                {"user_id": user.id},
+            )
+            .mappings()
+            .one()
+        )
+        assert email not in raw["email_ciphertext"]
+        assert raw["email_ciphertext"].startswith("v1:")
+        assert len(raw["email_lookup_hash"]) == 64
         device_count = db.session.scalar(
             select(func.count(UserDevice.id)).where(UserDevice.user_id == user.id)
         )
@@ -138,7 +158,11 @@ def test_account_lock_persists_and_expires_on_postgres() -> None:
         assert locked.get_json()["type"] == "invalid_credentials"
 
     with app.app_context():
-        user = db.session.scalar(select(User).where(User.email == email).with_for_update())
+        user = db.session.scalar(
+            select(User)
+            .where(User.email_lookup_hash == _email_lookup_hash(email))
+            .with_for_update()
+        )
         assert user is not None and user.locked_until is not None
         locked_until = user.locked_until
         if locked_until.tzinfo is None:

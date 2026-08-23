@@ -17,6 +17,7 @@ dependencies = [
   "celery[redis]>=5.4,<6",
   "PyJWT>=2.9,<3",
   "argon2-cffi>=23,<26",
+  "cryptography>=50,<51",
   "gunicorn>=23,<24",
   "elasticsearch>=9.4,<10",
   "Flask-SocketIO>=5.5,<6",
