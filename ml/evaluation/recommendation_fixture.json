@@ -1,0 +1,62 @@
+{
+  "project": {
+    "title": "Python API",
+    "description": "Build a Flask API",
+    "budget_min_minor": 80000,
+    "budget_max_minor": 120000,
+    "currency": "USD",
+    "skills": ["python", "flask"]
+  },
+  "candidates": [
+    {
+      "freelancer_id": "00000000-0000-4000-8000-000000000001",
+      "skills": ["python", "flask"],
+      "completed_jobs": 8,
+      "rating": 4.9,
+      "availability": true
+    },
+    {
+      "freelancer_id": "00000000-0000-4000-8000-000000000002",
+      "skills": ["python"],
+      "completed_jobs": 3,
+      "rating": 4.2,
+      "availability": true
+    },
+    {
+      "freelancer_id": "00000000-0000-4000-8000-000000000003",
+      "skills": ["flask"],
+      "completed_jobs": 0,
+      "rating": 3.5,
+      "availability": true
+    },
+    {
+      "freelancer_id": "00000000-0000-4000-8000-000000000004",
+      "skills": ["javascript"],
+      "completed_jobs": 12,
+      "rating": 4.8,
+      "availability": false
+    }
+  ],
+  "history": {
+    "00000000-0000-4000-8000-000000000001": [90000, 100000, 110000],
+    "00000000-0000-4000-8000-000000000002": [150000]
+  },
+  "relevance": {
+    "00000000-0000-4000-8000-000000000001": 3.0,
+    "00000000-0000-4000-8000-000000000002": 2.0,
+    "00000000-0000-4000-8000-000000000003": 1.0,
+    "00000000-0000-4000-8000-000000000004": 0.0
+  },
+  "relevant_ids": [
+    "00000000-0000-4000-8000-000000000001",
+    "00000000-0000-4000-8000-000000000002",
+    "00000000-0000-4000-8000-000000000003"
+  ],
+  "converted_ids": ["00000000-0000-4000-8000-000000000001"],
+  "minimum_quality": {
+    "ndcg_at_4": 0.95,
+    "precision_at_3": 1.0,
+    "recall_at_3": 1.0,
+    "conversion_at_1": 1.0
+  }
+}

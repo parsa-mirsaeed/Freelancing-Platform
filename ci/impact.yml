@@ -228,6 +228,13 @@ domains:
     integration:
       - tests/integration/test_ai.py
     flags: [python, database]
+  ml-evaluation:
+    paths:
+      - ml/evaluation/**
+      - tests/unit/ml/**
+    unit:
+      - tests/unit/ml
+    flags: [python]
   database:
     paths:
       - migrations/**
@@ -382,6 +389,19 @@ domains:
       - tests/unit/disputes.test.ts
     frontend_e2e:
       - tests/e2e/disputes.spec.ts
+    flags: [frontend, frontend_e2e]
+  frontend-ai:
+    paths:
+      - frontend/src/app/(dashboard)/dashboard/ai/**
+      - frontend/src/app/(dashboard)/dashboard/page.tsx
+      - frontend/src/features/ai/**
+      - frontend/src/lib/api/ai.ts
+      - frontend/tests/unit/ai.test.ts
+      - frontend/tests/e2e/ai.spec.ts
+    frontend_unit:
+      - tests/unit/ai.test.ts
+    frontend_e2e:
+      - tests/e2e/ai.spec.ts
     flags: [frontend, frontend_e2e]
   frontend-dependencies:
     paths:

@@ -5,11 +5,43 @@ import uuid
 from flask import Blueprint, g, jsonify, request
 
 from app.errors import ApiError
+from app.fraud.query import list_assessments
 from app.fraud.service import assess_risk, review_assessment, serialize_assessment
 from app.identity.auth import require_roles
 from app.identity.models import User
 
 fraud_bp = Blueprint("fraud", __name__)
+
+
+@fraud_bp.get("/api/v1/admin/risk/assessments")
+@require_roles("admin")
+def assessments():  # type: ignore[no-untyped-def]
+    try:
+        limit = int(request.args.get("limit", "25"))
+    except ValueError as exc:
+        raise ApiError(
+            "validation_error",
+            "Invalid limit",
+            422,
+            "limit must be an integer",
+        ) from exc
+    after_raw = request.args.get("after")
+    try:
+        after = uuid.UUID(after_raw) if after_raw else None
+    except ValueError as exc:
+        raise ApiError(
+            "validation_error",
+            "Invalid assessment cursor",
+            422,
+            "after must be a UUID",
+        ) from exc
+    return jsonify(
+        list_assessments(
+            after=after,
+            limit=limit,
+            review_status=request.args.get("status"),
+        )
+    )
 
 
 @fraud_bp.post("/api/v1/admin/risk/assessments")

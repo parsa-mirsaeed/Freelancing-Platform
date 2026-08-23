@@ -61,7 +61,7 @@ def test_model_registry_seed_and_active_version_constraint() -> None:
         db.session.rollback()
 
 
-def test_risk_review_and_price_interval_persist_on_postgres() -> None:
+def test_risk_review_queue_and_price_interval_persist_on_postgres() -> None:
     app = _app()
     suffix = str(uuid.uuid4())
     with app.test_client() as client:
@@ -84,16 +84,30 @@ def test_risk_review_and_price_interval_persist_on_postgres() -> None:
             db.session.add(UserRole(user_id=uuid.UUID(admin["user"]["id"]), role="admin"))
             db.session.commit()
 
-        assessed = client.post(
-            "/api/v1/admin/risk/assessments",
+        assessment = None
+        for _index in range(3):
+            assessed = client.post(
+                "/api/v1/admin/risk/assessments",
+                headers=auth_header(admin),
+                json={
+                    "subject_user_id": subject["user"]["id"],
+                    "text": "Contact me on Telegram https://one.example https://two.example https://three.example",
+                },
+            )
+            assert assessed.status_code == 201
+            assessment = assessed.get_json()
+        assert assessment is not None
+        assert assessment["review_status"] == "PENDING"
+
+        queued = client.get(
+            "/api/v1/admin/risk/assessments?status=PENDING&limit=10",
             headers=auth_header(admin),
-            json={
-                "subject_user_id": subject["user"]["id"],
-                "text": "Contact me on Telegram https://one.example https://two.example https://three.example",
-            },
         )
-        assert assessed.status_code == 201
-        assessment = assessed.get_json()
+        assert queued.status_code == 200
+        queued_body = queued.get_json()
+        assert any(item["id"] == assessment["id"] for item in queued_body["items"])
+        assert all(item["automatic_action"] is None for item in queued_body["items"])
+
         reviewed = client.post(
             f"/api/v1/admin/risk/assessments/{assessment['id']}/review",
             headers=auth_header(admin),

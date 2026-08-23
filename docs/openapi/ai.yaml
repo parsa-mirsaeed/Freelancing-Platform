@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Freelancing Platform AI Baseline API
-  version: 0.8.0
+  version: 0.9.0
 paths:
   /api/v1/projects/{project_id}/recommendations:
     get:
@@ -57,6 +57,33 @@ paths:
         '403':
           description: Admin role required
   /api/v1/admin/risk/assessments:
+    get:
+      summary: List explainable risk assessments for the human review queue
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [NOT_REQUIRED, PENDING, CLEARED, ESCALATED]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: after
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Newest-first cursor page of assessments; payload never contains the assessed raw text
+        '403':
+          description: Admin role required
+        '422':
+          description: Invalid status, limit, or cursor
     post:
       summary: Create an explainable fraud/spam risk assessment for human review
       responses:
