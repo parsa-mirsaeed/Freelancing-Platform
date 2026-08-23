@@ -13,6 +13,7 @@ from sqlalchemy import select
 from app import create_app
 from app.disputes.models import Dispute
 from app.extensions import db
+from app.identity.mfa import totp_code_for_secret
 from app.identity.models import UserRole
 from app.ledger.models import JournalTransaction, LedgerEntry
 from app.milestones.models import Milestone
@@ -154,6 +155,18 @@ def _admin(client, *, suffix: str):  # type: ignore[no-untyped-def]
     with client.application.app_context():
         db.session.add(UserRole(user_id=uuid.UUID(admin["user"]["id"]), role="admin"))
         db.session.commit()
+    enrolled = client.post(
+        "/api/v1/auth/mfa/totp/enroll",
+        headers=auth_header(admin),
+        json={"password": "correct horse battery staple"},
+    )
+    assert enrolled.status_code == 200
+    confirmed = client.post(
+        "/api/v1/auth/mfa/totp/confirm",
+        headers=auth_header(admin),
+        json={"code": totp_code_for_secret(enrolled.get_json()["secret"])},
+    )
+    assert confirmed.status_code == 200
     return admin
 
 

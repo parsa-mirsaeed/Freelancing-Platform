@@ -4,6 +4,7 @@ export class ProductApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "ProductApiError";
@@ -23,7 +24,11 @@ export async function productJson<T>(path: string, init: RequestInit = {}): Prom
     const payload = (await response.json().catch(() => null)) as ApiErrorPayload | null;
     throw new ProductApiError(
       response.status,
-      payload?.error?.message ?? payload?.message ?? `Request failed with ${response.status}`,
+      payload?.error?.message ??
+        payload?.detail ??
+        payload?.message ??
+        `Request failed with ${response.status}`,
+      payload?.error?.code ?? payload?.type,
     );
   }
   if (response.status === 204) return undefined as T;

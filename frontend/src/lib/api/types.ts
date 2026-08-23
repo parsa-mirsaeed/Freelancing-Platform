@@ -4,6 +4,7 @@ export interface SessionUser {
   id: string;
   email: string;
   roles: UserRole[];
+  mfa_enabled?: boolean;
 }
 
 export interface TokenEnvelope {
@@ -14,6 +15,11 @@ export interface TokenEnvelope {
 }
 
 export interface ApiErrorPayload {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  request_id?: string | null;
   error?: {
     code?: string;
     message?: string;
@@ -25,7 +31,7 @@ export interface ApiErrorPayload {
 export function apiErrorMessage(payload: unknown, fallback = "Something went wrong."): string {
   if (!payload || typeof payload !== "object") return fallback;
   const candidate = payload as ApiErrorPayload;
-  return candidate.error?.message ?? candidate.message ?? fallback;
+  return candidate.error?.message ?? candidate.detail ?? candidate.message ?? fallback;
 }
 
 export function isTokenEnvelope(value: unknown): value is TokenEnvelope {

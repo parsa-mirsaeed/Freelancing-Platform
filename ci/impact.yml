@@ -25,10 +25,12 @@ domains:
     paths:
       - app/identity/**
       - tests/unit/identity/**
+      - tests/integration/test_identity_security.py
     unit:
       - tests/unit/identity
     integration:
       - tests/integration/test_database.py
+      - tests/integration/test_identity_security.py
     flags: [python, database]
   audit:
     paths:
@@ -241,6 +243,7 @@ domains:
       - alembic.ini
     integration:
       - tests/integration/test_database.py
+      - tests/integration/test_identity_security.py
       - tests/integration/test_contracts.py
       - tests/integration/test_money.py
       - tests/integration/test_communication.py
@@ -276,6 +279,18 @@ domains:
     frontend_e2e:
       - tests/e2e/smoke.spec.ts
     flags: [frontend, frontend_e2e]
+  frontend-security:
+    paths:
+      - frontend/src/app/(dashboard)/dashboard/security/**
+      - frontend/src/features/security/**
+      - frontend/src/lib/api/security.ts
+      - frontend/src/lib/server/auth-session.ts
+      - frontend/src/app/api/session/login/route.ts
+      - frontend/src/app/api/session/register/route.ts
+      - frontend/tests/unit/security.test.ts
+    frontend_unit:
+      - tests/unit/security.test.ts
+    flags: [frontend]
   frontend-discovery:
     paths:
       - frontend/src/app/talent/**

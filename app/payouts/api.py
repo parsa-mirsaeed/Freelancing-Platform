@@ -4,7 +4,7 @@ from flask import Blueprint, g, jsonify, request
 
 from app.common.http import require_currency, require_int, require_json_object, require_string
 from app.errors import ApiError
-from app.identity.auth import require_roles
+from app.identity.auth import require_recent_mfa, require_roles
 from app.identity.models import User
 from app.payouts.service import create_payout
 
@@ -15,6 +15,7 @@ payouts_bp = Blueprint("payouts", __name__, url_prefix="/api/v1")
 @require_roles("freelancer")
 def post_payout():  # type: ignore[no-untyped-def]
     user: User = g.current_user
+    require_recent_mfa()
     payload = require_json_object(request)
     body, status = create_payout(
         user=user,

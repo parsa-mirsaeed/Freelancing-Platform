@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from app.extensions import db
+from app.identity.mfa import totp_code_for_secret
 from app.ledger.models import JournalTransaction
 from app.payments.models import MilestoneFunding, ProviderEvent
 from app.payments.service import reconcile_provider
@@ -17,6 +18,22 @@ from tests.helpers import auth_header, register_user
 pytestmark = pytest.mark.unit
 
 _WEBHOOK_SECRET = b"development-only-payment-webhook-secret"
+
+
+def _enable_mfa_for_session(client, user: dict[str, object]) -> None:  # type: ignore[no-untyped-def]
+    enrolled = client.post(
+        "/api/v1/auth/mfa/totp/enroll",
+        headers=auth_header(user),
+        json={"password": "correct horse battery staple"},
+    )
+    assert enrolled.status_code == 200
+    secret = enrolled.get_json()["secret"]
+    confirmed = client.post(
+        "/api/v1/auth/mfa/totp/confirm",
+        headers=auth_header(user),
+        json={"code": totp_code_for_secret(secret)},
+    )
+    assert confirmed.status_code == 200
 
 
 def _active_contract_with_milestone(client, *, suffix: str):  # type: ignore[no-untyped-def]
@@ -194,6 +211,7 @@ def test_funding_release_wallet_and_payout_are_ledger_backed_and_idempotent(
     assert wallet.status_code == 200
     assert wallet.get_json()["balances"] == [{"currency": "USD", "available_minor": 8100}]
 
+    _enable_mfa_for_session(client, freelancer)
     payout_headers = {**auth_header(freelancer), "Idempotency-Key": "payout-money-flow"}
     payout = client.post(
         "/api/v1/payouts",

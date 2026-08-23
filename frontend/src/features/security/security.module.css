@@ -1,0 +1,176 @@
+.page {
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2.25rem 0 5rem;
+}
+
+.hero,
+.panel,
+.state {
+  border: 1px solid var(--line);
+  border-radius: 1.4rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.6fr);
+  gap: 1.5rem;
+  padding: 2rem;
+}
+
+.hero h1,
+.heading h2,
+.state h1 {
+  margin: 0.35rem 0 0.65rem;
+}
+
+.hero p,
+.heading p,
+.state p,
+.flow p {
+  color: var(--text-muted);
+}
+
+.hero aside {
+  display: grid;
+  align-content: center;
+  gap: 0.45rem;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: var(--surface-strong);
+}
+
+.hero aside strong {
+  overflow-wrap: anywhere;
+}
+
+.panel {
+  margin-top: 1rem;
+  padding: 1.5rem;
+}
+
+.heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  align-items: start;
+}
+
+.heading p {
+  max-width: 560px;
+  margin: 0;
+}
+
+.flow {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  max-width: 720px;
+}
+
+.flow label {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 650;
+}
+
+.flow input {
+  min-height: 2.8rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: inherit;
+}
+
+.flow button {
+  width: fit-content;
+  min-height: 2.75rem;
+  padding: 0.7rem 1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: var(--text);
+  color: var(--background);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.flow button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.secretBox,
+.fresh,
+.challenge {
+  display: grid;
+  gap: 0.55rem;
+  padding: 1rem;
+  border-radius: 0.9rem;
+  background: var(--surface-strong);
+}
+
+.secretBox code,
+.codes code,
+.uri {
+  overflow-wrap: anywhere;
+}
+
+.uri {
+  font-size: 0.78rem;
+}
+
+.fresh strong,
+.success {
+  color: var(--success, #176a47);
+}
+
+.challenge strong,
+.error {
+  color: var(--danger, #9f2d2d);
+}
+
+.error,
+.success {
+  margin: 1rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 0.8rem;
+  background: var(--surface);
+}
+
+.codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  padding: 0;
+  list-style: none;
+}
+
+.codes li {
+  padding: 0.75rem;
+  border-radius: 0.7rem;
+  background: var(--surface-strong);
+}
+
+.state {
+  padding: 2rem;
+}
+
+@media (max-width: 760px) {
+  .hero {
+    grid-template-columns: 1fr;
+    padding: 1.35rem;
+  }
+
+  .heading {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .codes {
+    grid-template-columns: 1fr;
+  }
+}
