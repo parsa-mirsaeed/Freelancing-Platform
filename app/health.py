@@ -36,5 +36,5 @@ def _dependency_checks() -> dict[str, bool]:
         redis_extension.get_client(current_app).ping()
         checks["redis"] = True
     except Exception:  # noqa: BLE001
-        pass
+        checks["redis"] = False
     return checks

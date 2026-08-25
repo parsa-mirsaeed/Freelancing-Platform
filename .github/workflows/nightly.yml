@@ -146,14 +146,27 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --disable-pip-version-check -e .
       - run: alembic upgrade head
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Backup and restore into a separate database
         run: |
-          pg_dump -h localhost -U postgres -Fc freelancing > /tmp/freelancing.dump
-          createdb -h localhost -U postgres freelancing_restore
-          pg_restore -h localhost -U postgres -d freelancing_restore /tmp/freelancing.dump
-          psql -h localhost -U postgres -d freelancing_restore -Atc 'select count(*) from alembic_version' | grep -qx '1'
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            -v /tmp:/backup \
+            postgres:17-alpine \
+            pg_dump -h 127.0.0.1 -U postgres -Fc -f /backup/freelancing.dump freelancing
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            postgres:17-alpine \
+            createdb -h 127.0.0.1 -U postgres freelancing_restore
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            -v /tmp:/backup \
+            postgres:17-alpine \
+            pg_restore -h 127.0.0.1 -U postgres -d freelancing_restore /backup/freelancing.dump
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            postgres:17-alpine \
+            psql -h 127.0.0.1 -U postgres -d freelancing_restore -Atc \
+            'select count(*) from alembic_version' | grep -qx '1'
 
   security:
     runs-on: ubuntu-latest

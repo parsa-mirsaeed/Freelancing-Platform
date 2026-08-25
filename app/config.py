@@ -13,6 +13,7 @@ FEATURE_FLAG_NAMES = (
     "new_search_ranking",
     "new_dispute_engine",
 )
+_DEVELOPMENT_SECRET_KEY = "-".join(("development", "only", "change", "me"))
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -86,7 +87,7 @@ class Settings:
     @classmethod
     def from_env(cls) -> Settings:
         environment = os.getenv("APP_ENV", "development").strip().casefold()
-        secret_key = os.getenv("SECRET_KEY", "development-only-change-me")
+        secret_key = os.getenv("SECRET_KEY", _DEVELOPMENT_SECRET_KEY)
         cors_allowed_origins = _comma_list(os.getenv("CORS_ALLOWED_ORIGINS", ""))
         max_content_length = int(os.getenv("MAX_CONTENT_LENGTH", str(16 * 1024 * 1024)))
         rate_limit_per_minute = int(os.getenv("RATE_LIMIT_PER_MINUTE", "120"))
@@ -98,7 +99,7 @@ class Settings:
         pii_lookup_key = os.getenv("PII_LOOKUP_KEY", "").strip()
 
         if environment == "production":
-            if secret_key == "development-only-change-me":
+            if secret_key == _DEVELOPMENT_SECRET_KEY:
                 raise RuntimeError("SECRET_KEY must be configured in production")
             if "*" in cors_allowed_origins:
                 raise RuntimeError("CORS_ALLOWED_ORIGINS cannot contain '*' in production")

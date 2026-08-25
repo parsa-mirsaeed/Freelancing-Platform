@@ -1,0 +1,67 @@
+name: Backup Restore Gate
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/nightly.yml
+      - .github/workflows/backup-restore-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-restore-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  backup-restore:
+    name: PostgreSQL backup + restore
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: freelancing
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d freelancing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/freelancing
+      PGPASSWORD: postgres
+      SECRET_KEY: backup-gate-only-secret
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - run: alembic upgrade head
+      - name: Backup and restore into a separate database
+        run: |
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            -v /tmp:/backup \
+            postgres:17-alpine \
+            pg_dump -h 127.0.0.1 -U postgres -Fc -f /backup/freelancing.dump freelancing
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            postgres:17-alpine \
+            createdb -h 127.0.0.1 -U postgres freelancing_restore
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            -v /tmp:/backup \
+            postgres:17-alpine \
+            pg_restore -h 127.0.0.1 -U postgres -d freelancing_restore /backup/freelancing.dump
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            postgres:17-alpine \
+            psql -h 127.0.0.1 -U postgres -d freelancing_restore -Atc \
+            'select count(*) from alembic_version' | grep -qx '1'

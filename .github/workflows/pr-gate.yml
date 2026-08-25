@@ -78,10 +78,11 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]' bandit
       - run: ruff check app ci tests
       - run: ruff format --check app ci tests
       - run: mypy app ci
+      - run: bandit -q -r app
 
   unit:
     name: Affected unit tests
@@ -346,7 +347,7 @@ jobs:
         run: python ci/check_markdown.py $(git ls-files '*.md')
 
   image:
-    name: Container build
+    name: Container build + scan
     needs: changes
     if: needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
@@ -359,9 +360,17 @@ jobs:
         with:
           context: .
           push: false
+          load: true
           tags: freelancing-platform:pr
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: freelancing-platform:pr
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
 
   gate:
     name: gate

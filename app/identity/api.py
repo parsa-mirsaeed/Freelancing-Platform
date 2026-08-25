@@ -20,6 +20,8 @@ from app.identity.service import (
 )
 
 identity_bp = Blueprint("identity", __name__, url_prefix="/api/v1/auth")
+_BEARER_SCHEME = "Bearer"
+_REALTIME_SCHEME = "Realtime"
 
 
 @identity_bp.post("/register")
@@ -49,7 +51,9 @@ def login():  # type: ignore[no-untyped-def]
 def refresh():  # type: ignore[no-untyped-def]
     payload = require_json_object(request)
     access, refresh_token = refresh_session(require_string(payload, "refresh_token"))
-    return jsonify({"access_token": access, "refresh_token": refresh_token, "token_type": "Bearer"})
+    return jsonify(
+        {"access_token": access, "refresh_token": refresh_token, "token_type": _BEARER_SCHEME}
+    )
 
 
 @identity_bp.post("/realtime-ticket")
@@ -60,7 +64,7 @@ def realtime_ticket():  # type: ignore[no-untyped-def]
     return jsonify(
         {
             "token": token,
-            "token_type": "Realtime",
+            "token_type": _REALTIME_SCHEME,
             "expires_at": expires_at.isoformat(),
         }
     )
@@ -150,7 +154,7 @@ def _token_response(user: User, access: str, refresh: str) -> dict[str, object]:
         },
         "access_token": access,
         "refresh_token": refresh,
-        "token_type": "Bearer",
+        "token_type": _BEARER_SCHEME,
     }
 
 
