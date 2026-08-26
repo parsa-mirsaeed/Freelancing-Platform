@@ -3,16 +3,19 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import os
 
 from app.errors import ApiError
-from app.payments.providers.base import ProviderResult, VerifiedWebhook
+from app.payments.providers.base import PaymentAction, ProviderResult, VerifiedWebhook
 
 
 class SandboxPaymentProvider:
     """Deterministic no-network adapter for local development and CI."""
 
     name = "sandbox"
+    webhook_signature_header = "X-Payment-Signature"
+
+    def __init__(self, *, webhook_secret: str) -> None:
+        self._webhook_secret = webhook_secret
 
     def create_payment(
         self, *, amount_minor: int, currency: str, idempotency_key: str
@@ -28,6 +31,10 @@ class SandboxPaymentProvider:
     def verify_payment(self, *, reference: str) -> ProviderResult:
         amount_minor, currency = self._parse_payment_reference(reference)
         return ProviderResult(reference, "CAPTURED", amount_minor, currency)
+
+    def get_payment_action(self, *, reference: str) -> PaymentAction | None:
+        self._parse_payment_reference(reference)
+        return None
 
     def refund(
         self, *, reference: str, amount_minor: int, currency: str, idempotency_key: str
@@ -57,8 +64,7 @@ class SandboxPaymentProvider:
         return self.verify_payment(reference=reference)
 
     def verify_webhook(self, *, payload: bytes, signature: str) -> VerifiedWebhook:
-        secret = os.getenv("PAYMENT_WEBHOOK_SECRET", "development-only-payment-webhook-secret")
-        expected = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+        expected = hmac.new(self._webhook_secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(expected, signature):
             raise ApiError(
                 "invalid_webhook_signature",
