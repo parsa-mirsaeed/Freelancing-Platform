@@ -123,7 +123,7 @@ export function mutateMilestoneFinancials(
 }
 
 export function getPaymentAction(paymentIntentId: string): Promise<PaymentActionResult> {
-  return productJson<PaymentActionResult>(`payments/${paymentIntentId}/action`);
+  return productJson<PaymentActionResult>(`payment-intents/${paymentIntentId}/action`);
 }
 
 export function getWallet(signal?: AbortSignal): Promise<WalletBalances> {
