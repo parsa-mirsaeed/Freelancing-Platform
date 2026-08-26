@@ -2,7 +2,7 @@ import type { ContractStatus, MemberRole, MilestoneStatus } from "@/lib/api/cont
 import { productJson } from "@/lib/api/product-client";
 
 export const CURRENT_PAYMENT_PROVIDER =
-  process.env.NEXT_PUBLIC_PAYMENT_PROVIDER?.trim().toLowerCase() || "sandbox";
+  process.env.NEXT_PUBLIC_PAYMENT_PROVIDER?.trim().toLowerCase() || undefined;
 
 export interface MilestoneFinancialState {
   milestone_id: string;
@@ -28,9 +28,8 @@ export interface PaymentActionResult {
   provider: string;
   status: string;
   action: null | {
-    kind: "stripe_payment_intent" | string;
-    client_secret: string;
-    publishable_key: string;
+    kind: "redirect" | string;
+    redirect_url: string;
   };
 }
 
@@ -117,7 +116,7 @@ export function mutateMilestoneFinancials(
     headers: { "Idempotency-Key": idempotencyKey },
     body:
       action === "fund" || action === "refund"
-        ? JSON.stringify({ provider: CURRENT_PAYMENT_PROVIDER })
+        ? JSON.stringify(CURRENT_PAYMENT_PROVIDER ? { provider: CURRENT_PAYMENT_PROVIDER } : {})
         : undefined,
   });
 }
@@ -145,7 +144,7 @@ export function requestPayout({
     body: JSON.stringify({
       amount_minor: amountMinor,
       currency,
-      provider: CURRENT_PAYMENT_PROVIDER,
+      ...(CURRENT_PAYMENT_PROVIDER ? { provider: CURRENT_PAYMENT_PROVIDER } : {}),
     }),
   });
 }
