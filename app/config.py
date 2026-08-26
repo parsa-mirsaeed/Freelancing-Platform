@@ -163,7 +163,8 @@ class Settings:
             if payment_runtime_enabled:
                 if payment_default_provider == "sandbox":
                     raise RuntimeError(
-                        "PAYMENT_DEFAULT_PROVIDER cannot be sandbox when production payments are enabled"
+                        "PAYMENT_DEFAULT_PROVIDER cannot be sandbox when production "
+                        "payments are enabled"
                     )
                 if payment_default_provider == "stripe":
                     missing = [
