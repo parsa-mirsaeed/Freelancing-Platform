@@ -20,7 +20,8 @@ def configure_payout_provider_account(
     external_account_reference: str,
 ) -> dict[str, object]:
     freelancer = db.session.get(User, freelancer_user_id)
-    if freelancer is None or "freelancer" not in {assignment.role for assignment in freelancer.roles}:
+    freelancer_roles = {assignment.role for assignment in freelancer.roles} if freelancer else set()
+    if freelancer is None or "freelancer" not in freelancer_roles:
         raise ApiError(
             "freelancer_not_found",
             "Freelancer not found",
