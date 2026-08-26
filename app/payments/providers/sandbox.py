@@ -7,6 +7,8 @@ import json
 from app.errors import ApiError
 from app.payments.providers.base import PaymentAction, ProviderResult, VerifiedWebhook
 
+_DEVELOPMENT_WEBHOOK_SECRET = "development-only-payment-webhook-secret"
+
 
 class SandboxPaymentProvider:
     """Deterministic no-network adapter for local development and CI."""
@@ -14,7 +16,7 @@ class SandboxPaymentProvider:
     name = "sandbox"
     webhook_signature_header = "X-Payment-Signature"
 
-    def __init__(self, *, webhook_secret: str) -> None:
+    def __init__(self, *, webhook_secret: str = _DEVELOPMENT_WEBHOOK_SECRET) -> None:
         self._webhook_secret = webhook_secret
 
     def create_payment(
@@ -47,6 +49,10 @@ class SandboxPaymentProvider:
             amount_minor=amount_minor,
             currency=currency,
         )
+
+    def verify_refund(self, *, reference: str) -> ProviderResult:
+        amount_minor, currency = self._parse_refund_reference(reference)
+        return ProviderResult(reference, "SUCCEEDED", amount_minor, currency)
 
     def payout(
         self, *, user_reference: str, amount_minor: int, currency: str, idempotency_key: str
@@ -126,5 +132,26 @@ class SandboxPaymentProvider:
                 "Invalid provider reference",
                 502,
                 "Sandbox payment reference contains an invalid amount",
+            ) from exc
+        return amount_minor, parts[3]
+
+    @staticmethod
+    def _parse_refund_reference(reference: str) -> tuple[int, str]:
+        parts = reference.split("_")
+        if len(parts) != 5 or parts[:2] != ["sandbox", "refund"]:
+            raise ApiError(
+                "provider_reference_invalid",
+                "Invalid provider reference",
+                502,
+                "Sandbox refund reference could not be verified",
+            )
+        try:
+            amount_minor = int(parts[2])
+        except ValueError as exc:
+            raise ApiError(
+                "provider_reference_invalid",
+                "Invalid provider reference",
+                502,
+                "Sandbox refund reference contains an invalid amount",
             ) from exc
         return amount_minor, parts[3]
