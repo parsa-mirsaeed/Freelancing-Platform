@@ -28,6 +28,7 @@ from app.payments.models import (
     Refund,
 )
 from app.payments.policies import can_fund_milestone, can_release_or_refund
+from app.payments.providers.base import ProviderTemporaryError
 from app.payments.providers.registry import get_provider
 
 
@@ -400,12 +401,18 @@ def refund_milestone(
         raise RuntimeError("Captured funding payment is missing its provider reference")
     provider = get_provider(refund.provider)
     try:
-        result = provider.refund(
-            reference=funding_intent.provider_reference,
-            amount_minor=refund.amount_minor,
-            currency=refund.currency,
-            idempotency_key=idempotency_key,
-        )
+        if refund.provider_reference is None:
+            result = provider.refund(
+                reference=funding_intent.provider_reference,
+                amount_minor=refund.amount_minor,
+                currency=refund.currency,
+                idempotency_key=idempotency_key,
+            )
+        else:
+            result = provider.verify_refund(reference=refund.provider_reference)
+    except ProviderTemporaryError:
+        db.session.rollback()
+        return _pending_refund_body(refund), 503
     except Exception:
         return _fail_refund(refund.id, actor_user_id=user.id)
 
@@ -425,8 +432,20 @@ def refund_milestone(
         return _fail_refund(refund.id, actor_user_id=user.id)
     if milestone.status != "FUNDED":
         raise RuntimeError("Pending refund milestone left the FUNDED state")
-
+    if refund.provider_reference is not None and refund.provider_reference != result.reference:
+        raise ApiError(
+            "provider_reference_conflict",
+            "Provider reference conflict",
+            409,
+            "Payment provider returned a different refund reference for the same operation",
+        )
     refund.provider_reference = result.reference
+    if result.status == "PENDING":
+        db.session.commit()
+        return _serialize_refund(refund), 202
+    if result.status != "SUCCEEDED":
+        return _fail_refund(refund.id, actor_user_id=user.id)
+
     refund.status = "SUCCEEDED"
     milestone.status = "CREATED"
     milestone.events.append(
@@ -746,6 +765,16 @@ def _fail_refund(
     complete_idempotency(persisted_idem, status=502, body=body)
     db.session.commit()
     return body, 502
+
+
+def _pending_refund_body(refund: Refund) -> dict[str, object]:
+    return {
+        "type": "payment_provider_temporarily_unavailable",
+        "title": "Payment provider temporarily unavailable",
+        "status": 503,
+        "detail": "Refund outcome is unknown; retry with the same Idempotency-Key",
+        "refund_id": str(refund.id),
+    }
 
 
 def _failed_refund_body(refund: Refund) -> dict[str, object]:
