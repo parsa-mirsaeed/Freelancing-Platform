@@ -82,6 +82,7 @@ class Settings:
     pii_encryption_keys: str
     pii_lookup_key: str
     payment_default_provider: str
+    payment_runtime_enabled: bool
     payment_webhook_secret: str
     stripe_secret_key: str
     stripe_publishable_key: str
@@ -111,6 +112,10 @@ class Settings:
             "PAYMENT_DEFAULT_PROVIDER",
             "stripe" if environment == "production" else "sandbox",
         ).strip().casefold()
+        payment_runtime_enabled = _env_bool(
+            "PAYMENT_RUNTIME_ENABLED",
+            default=environment != "production",
+        )
         payment_webhook_secret = os.getenv(
             "PAYMENT_WEBHOOK_SECRET", _DEVELOPMENT_PAYMENT_WEBHOOK_SECRET
         ).strip()
@@ -136,22 +141,25 @@ class Settings:
                 raise RuntimeError("PII_ENCRYPTION_KEYS must be configured in production")
             if not pii_lookup_key:
                 raise RuntimeError("PII_LOOKUP_KEY must be configured in production")
-            if payment_default_provider == "sandbox":
-                raise RuntimeError("PAYMENT_DEFAULT_PROVIDER cannot be sandbox in production")
-            if payment_default_provider == "stripe":
-                missing = [
-                    name
-                    for name, value in (
-                        ("STRIPE_SECRET_KEY", stripe_secret_key),
-                        ("STRIPE_PUBLISHABLE_KEY", stripe_publishable_key),
-                        ("STRIPE_WEBHOOK_SECRET", stripe_webhook_secret),
-                    )
-                    if not value
-                ]
-                if missing:
+            if payment_runtime_enabled:
+                if payment_default_provider == "sandbox":
                     raise RuntimeError(
-                        "Stripe production configuration is incomplete: " + ", ".join(missing)
+                        "PAYMENT_DEFAULT_PROVIDER cannot be sandbox when production payments are enabled"
                     )
+                if payment_default_provider == "stripe":
+                    missing = [
+                        name
+                        for name, value in (
+                            ("STRIPE_SECRET_KEY", stripe_secret_key),
+                            ("STRIPE_PUBLISHABLE_KEY", stripe_publishable_key),
+                            ("STRIPE_WEBHOOK_SECRET", stripe_webhook_secret),
+                        )
+                        if not value
+                    ]
+                    if missing:
+                        raise RuntimeError(
+                            "Stripe production configuration is incomplete: " + ", ".join(missing)
+                        )
         else:
             if not pii_encryption_keys:
                 pii_encryption_keys = "local-v1:" + _derived_local_key(
@@ -186,6 +194,7 @@ class Settings:
             pii_encryption_keys=pii_encryption_keys,
             pii_lookup_key=pii_lookup_key,
             payment_default_provider=payment_default_provider,
+            payment_runtime_enabled=payment_runtime_enabled,
             payment_webhook_secret=payment_webhook_secret,
             stripe_secret_key=stripe_secret_key,
             stripe_publishable_key=stripe_publishable_key,
@@ -216,6 +225,7 @@ class Settings:
             "PII_ENCRYPTION_KEYS": self.pii_encryption_keys,
             "PII_LOOKUP_KEY": self.pii_lookup_key,
             "PAYMENT_DEFAULT_PROVIDER": self.payment_default_provider,
+            "PAYMENT_RUNTIME_ENABLED": self.payment_runtime_enabled,
             "PAYMENT_WEBHOOK_SECRET": self.payment_webhook_secret,
             "STRIPE_SECRET_KEY": self.stripe_secret_key,
             "STRIPE_PUBLISHABLE_KEY": self.stripe_publishable_key,
