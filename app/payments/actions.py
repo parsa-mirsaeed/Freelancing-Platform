@@ -6,6 +6,7 @@ from app.errors import ApiError
 from app.extensions import db
 from app.identity.models import User
 from app.payments.models import PaymentIntent
+from app.payments.providers.base import ProviderTemporaryError
 from app.payments.providers.registry import get_provider
 
 
@@ -29,7 +30,15 @@ def get_payment_action(*, user: User, payment_intent_id: uuid.UUID) -> dict[str,
         raise RuntimeError("Payment intent is missing its provider reference")
 
     provider = get_provider(intent.provider)
-    action = provider.get_payment_action(reference=intent.provider_reference)
+    try:
+        action = provider.get_payment_action(reference=intent.provider_reference)
+    except ProviderTemporaryError as exc:
+        raise ApiError(
+            "payment_provider_temporarily_unavailable",
+            "Payment provider temporarily unavailable",
+            503,
+            "Payment action could not be retrieved; retry shortly",
+        ) from exc
     return {
         "payment_intent_id": str(intent.id),
         "provider": intent.provider,
@@ -39,8 +48,7 @@ def get_payment_action(*, user: User, payment_intent_id: uuid.UUID) -> dict[str,
             if action is None
             else {
                 "kind": action.kind,
-                "client_secret": action.client_secret,
-                "publishable_key": action.publishable_key,
+                "redirect_url": action.redirect_url,
             }
         ),
     }
