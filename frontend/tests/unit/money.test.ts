@@ -4,6 +4,7 @@ import {
   CURRENT_PAYMENT_PROVIDER,
   canOfferFinancialAction,
   financialActionAmount,
+  getPaymentAction,
   mutateMilestoneFinancials,
   requestPayout,
   type MilestoneFinancialState,
@@ -157,6 +158,11 @@ describe("money mutations", () => {
       headers: { "Idempotency-Key": "release-key" },
       body: undefined,
     });
+  });
+
+  it("retrieves the provider action through the authenticated payment-intent route", async () => {
+    await getPaymentAction("payment-intent-1");
+    expect(productJson).toHaveBeenLastCalledWith("payment-intents/payment-intent-1/action");
   });
 
   it("posts payout amount/currency without mutating any local balance", async () => {
