@@ -22,6 +22,7 @@ from app.payments.models import FinancialIdempotencyKey
 from app.payments.providers.base import ProviderTemporaryError
 from app.payments.providers.registry import get_provider
 from app.payouts.models import Payout
+from app.payouts.provider_accounts import resolve_payout_destination
 
 
 def create_payout(
@@ -61,6 +62,10 @@ def create_payout(
         if terminal is not None:
             return terminal
     else:
+        provider_destination_reference = resolve_payout_destination(
+            freelancer_user_id=user.id,
+            provider_name=provider_name,
+        )
         wallet = db.session.scalar(
             select(LedgerAccount)
             .where(
@@ -94,6 +99,7 @@ def create_payout(
             idempotency_key_id=idem.id,
             journal_transaction_id=journal.id,
             provider=provider_name,
+            provider_destination_reference=provider_destination_reference,
             amount_minor=amount_minor,
             currency=currency,
             status="PENDING",
@@ -116,7 +122,7 @@ def create_payout(
     provider = get_provider(payout.provider)
     try:
         result = provider.payout(
-            user_reference=str(user.id),
+            user_reference=payout.provider_destination_reference,
             amount_minor=payout.amount_minor,
             currency=payout.currency,
             idempotency_key=idempotency_key,
