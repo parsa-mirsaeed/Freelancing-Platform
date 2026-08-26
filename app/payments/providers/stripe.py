@@ -278,8 +278,6 @@ class StripePaymentProvider:
             return "CAPTURED"
         if status == "canceled":
             return "CANCELLED"
-        if status in {"requires_payment_method", "payment_failed"}:
-            return "FAILED"
         return "PENDING"
 
     @staticmethod
