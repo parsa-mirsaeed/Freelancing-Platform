@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import uuid
+
 from flask import Blueprint, g, jsonify, request
 
 from app.common.http import require_currency, require_int, require_json_object, require_string
 from app.errors import ApiError
 from app.identity.auth import require_recent_mfa, require_roles
 from app.identity.models import User
+from app.payouts.provider_accounts import (
+    configure_payout_provider_account,
+    disable_payout_provider_account,
+)
 from app.payouts.service import create_payout
 
 payouts_bp = Blueprint("payouts", __name__, url_prefix="/api/v1")
@@ -25,6 +31,44 @@ def post_payout():  # type: ignore[no-untyped-def]
         idempotency_key=_idempotency_key(),
     )
     return jsonify(body), status
+
+
+@payouts_bp.put(
+    "/admin/freelancers/<uuid:freelancer_user_id>/payout-provider-accounts/<provider_name>"
+)
+@require_roles("admin")
+def put_payout_provider_account(
+    freelancer_user_id: uuid.UUID, provider_name: str
+):  # type: ignore[no-untyped-def]
+    administrator: User = g.current_user
+    payload = require_json_object(request)
+    body = configure_payout_provider_account(
+        administrator=administrator,
+        freelancer_user_id=freelancer_user_id,
+        provider_name=provider_name,
+        external_account_reference=require_string(
+            payload,
+            "external_account_reference",
+            max_length=255,
+        ),
+    )
+    return jsonify(body)
+
+
+@payouts_bp.delete(
+    "/admin/freelancers/<uuid:freelancer_user_id>/payout-provider-accounts/<provider_name>"
+)
+@require_roles("admin")
+def delete_payout_provider_account(
+    freelancer_user_id: uuid.UUID, provider_name: str
+):  # type: ignore[no-untyped-def]
+    administrator: User = g.current_user
+    body = disable_payout_provider_account(
+        administrator=administrator,
+        freelancer_user_id=freelancer_user_id,
+        provider_name=provider_name,
+    )
+    return jsonify(body)
 
 
 def _idempotency_key() -> str:
