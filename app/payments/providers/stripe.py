@@ -58,27 +58,35 @@ class StripePaymentProvider:
     def create_payment(
         self, *, amount_minor: int, currency: str, idempotency_key: str
     ) -> ProviderResult:
-        session = self._provider_call(
-            "create checkout session",
-            lambda: self._client.v1.checkout.sessions.create(
-                {
-                    "mode": "payment",
-                    "success_url": self._checkout_success_url,
-                    "cancel_url": self._checkout_cancel_url,
-                    "line_items": [
-                        {
-                            "quantity": 1,
-                            "price_data": {
-                                "currency": currency.lower(),
-                                "unit_amount": amount_minor,
-                                "product_data": {"name": "Milestone escrow funding"},
-                            },
-                        }
-                    ],
-                },
-                options={"idempotency_key": idempotency_key},
-            ),
-        )
+        try:
+            session = self._provider_call(
+                "create checkout session",
+                lambda: self._client.v1.checkout.sessions.create(
+                    {
+                        "mode": "payment",
+                        "success_url": self._checkout_success_url,
+                        "cancel_url": self._checkout_cancel_url,
+                        "line_items": [
+                            {
+                                "quantity": 1,
+                                "price_data": {
+                                    "currency": currency.lower(),
+                                    "unit_amount": amount_minor,
+                                    "product_data": {"name": "Milestone escrow funding"},
+                                },
+                            }
+                        ],
+                    },
+                    options={"idempotency_key": idempotency_key},
+                ),
+            )
+        except ProviderTemporaryError as exc:
+            raise ApiError(
+                "payment_provider_temporarily_unavailable",
+                "Payment provider temporarily unavailable",
+                503,
+                "Stripe Checkout outcome is unknown; retry with the same Idempotency-Key",
+            ) from exc
         return self._checkout_result(session)
 
     def verify_payment(self, *, reference: str) -> ProviderResult:
