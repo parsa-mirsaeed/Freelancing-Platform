@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-import stripe
 from stripe import SignatureVerificationError, StripeClient, Webhook
 
 from app.errors import ApiError
@@ -84,14 +83,11 @@ class StripePaymentProvider:
             },
             options={"idempotency_key": idempotency_key},
         )
-        refund_currency = str(self._value(refund, "currency", currency)).upper()
-        status = self._refund_status(str(self._value(refund, "status", "pending")))
-        return ProviderResult(
-            reference=str(self._value(refund, "id", "")),
-            status=status,
-            amount_minor=int(self._value(refund, "amount", amount_minor)),
-            currency=refund_currency,
-        )
+        return self._refund_result(refund, fallback_currency=currency)
+
+    def verify_refund(self, *, reference: str) -> ProviderResult:
+        refund = self._client.v1.refunds.retrieve(reference)
+        return self._refund_result(refund)
 
     def payout(
         self, *, user_reference: str, amount_minor: int, currency: str, idempotency_key: str
@@ -112,10 +108,10 @@ class StripePaymentProvider:
             options={"idempotency_key": idempotency_key},
         )
         return ProviderResult(
-            reference=str(self._value(transfer, "id", "")),
+            reference=self._required_string(transfer, "id"),
             status="SUCCEEDED",
-            amount_minor=int(self._value(transfer, "amount", amount_minor)),
-            currency=str(self._value(transfer, "currency", currency)).upper(),
+            amount_minor=self._required_int(transfer, "amount"),
+            currency=self._required_string(transfer, "currency").upper(),
         )
 
     def get_transaction(self, *, reference: str) -> ProviderResult:
@@ -190,14 +186,29 @@ class StripePaymentProvider:
         )
 
     def _payment_result(self, intent: Any) -> ProviderResult:
-        amount = self._required_int(intent, "amount")
-        currency = self._required_string(intent, "currency").upper()
-        status = self._payment_status(str(self._value(intent, "status", "")))
         return ProviderResult(
             reference=self._required_string(intent, "id"),
-            status=status,
-            amount_minor=amount,
-            currency=currency,
+            status=self._payment_status(str(self._value(intent, "status", ""))),
+            amount_minor=self._required_int(intent, "amount"),
+            currency=self._required_string(intent, "currency").upper(),
+        )
+
+    def _refund_result(
+        self, refund: Any, *, fallback_currency: str | None = None
+    ) -> ProviderResult:
+        currency = self._value(refund, "currency", fallback_currency)
+        if not isinstance(currency, str) or not currency:
+            raise ApiError(
+                "provider_response_invalid",
+                "Invalid provider response",
+                502,
+                "Stripe refund response is missing currency",
+            )
+        return ProviderResult(
+            reference=self._required_string(refund, "id"),
+            status=self._refund_status(str(self._value(refund, "status", "pending"))),
+            amount_minor=self._required_int(refund, "amount"),
+            currency=currency.upper(),
         )
 
     @staticmethod
