@@ -19,8 +19,7 @@ class ProviderResult:
 @dataclass(frozen=True, slots=True)
 class PaymentAction:
     kind: str
-    client_secret: str
-    publishable_key: str
+    redirect_url: str
 
 
 @dataclass(frozen=True, slots=True)
