@@ -120,6 +120,23 @@ def test_paid_checkout_has_no_follow_up_action() -> None:
     assert provider.get_payment_action(reference="cs_test_paid") is None
 
 
+def test_expired_checkout_requires_a_new_funding_attempt() -> None:
+    session = {
+        "id": "cs_test_expired",
+        "status": "expired",
+        "payment_status": "unpaid",
+        "amount_total": 1250,
+        "currency": "usd",
+        "url": None,
+    }
+    provider = _provider(
+        FakeStripeClient(checkout_sessions=FakeEndpoint(retrieve_result=session))
+    )
+
+    with pytest.raises(ApiError, match="Payment action expired"):
+        provider.get_payment_action(reference="cs_test_expired")
+
+
 def test_stripe_webhook_maps_checkout_success_to_provider_neutral_capture(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
