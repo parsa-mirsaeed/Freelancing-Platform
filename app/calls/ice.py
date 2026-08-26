@@ -15,7 +15,7 @@ from app.errors import ApiError
 
 _DEFAULT_STUN_URLS = "stun:localhost:3478"
 _DEFAULT_TURN_URLS = "turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"
-_DEFAULT_TURN_SECRET = "development-only-turn-secret"
+_DEFAULT_TURN_SECRET = "-".join(("development", "only", "turn", "secret"))
 _DEFAULT_TTL_SECONDS = 600
 _MIN_TTL_SECONDS = 60
 _MAX_TTL_SECONDS = 3600

@@ -11,6 +11,8 @@ from app.extensions import db
 from app.identity.models import User, UserSession
 from app.identity.security import decode_token
 
+_REALTIME_KIND = "realtime"
+
 
 @dataclass(frozen=True, slots=True)
 class SocketPrincipal:
@@ -21,7 +23,7 @@ class SocketPrincipal:
 
 def _decode_socket_token(token: str) -> dict[str, Any]:
     """Prefer scoped realtime tickets while retaining access-token compatibility for API clients."""
-    for token_type in ("realtime", "access"):
+    for token_type in (_REALTIME_KIND, "access"):
         try:
             return decode_token(token, expected_type=token_type)
         except ValueError:
@@ -56,7 +58,7 @@ def authenticate_socket_token(token: str) -> SocketPrincipal | None:
     # underlying session through load_socket_user(), so the Redis principal binding
     # may safely live until that session expires. Existing access-token socket clients
     # retain their previous access-token-lifetime binding behavior.
-    binding_expires_at = session_expires_at if token_type == "realtime" else token_expires_at
+    binding_expires_at = session_expires_at if token_type == _REALTIME_KIND else token_expires_at
     return SocketPrincipal(
         user=user,
         session_id=session_id,
