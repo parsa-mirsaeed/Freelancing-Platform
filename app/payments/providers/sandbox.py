@@ -54,6 +54,16 @@ class SandboxPaymentProvider:
         amount_minor, currency = self._parse_refund_reference(reference)
         return ProviderResult(reference, "SUCCEEDED", amount_minor, currency)
 
+    def validate_payout_destination(self, *, reference: str) -> str:
+        if not reference:
+            raise ApiError(
+                "payout_destination_invalid",
+                "Invalid payout destination",
+                422,
+                "Sandbox payout destination is required",
+            )
+        return reference
+
     def payout(
         self, *, user_reference: str, amount_minor: int, currency: str, idempotency_key: str
     ) -> ProviderResult:
