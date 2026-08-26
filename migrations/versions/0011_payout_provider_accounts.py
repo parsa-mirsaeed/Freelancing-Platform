@@ -63,6 +63,11 @@ def upgrade() -> None:
         unique=False,
     )
 
+    # Expand-only for rolling deploy compatibility. Existing sandbox rows are
+    # backfilled, while the column remains nullable so an old application pod
+    # can continue writing during the rollout. New code always snapshots a
+    # destination. A later contract migration may enforce NOT NULL after the
+    # old version is no longer serving writes and null-row validation is clean.
     op.add_column(
         "payouts",
         sa.Column("provider_destination_reference", sa.String(length=255), nullable=True),
@@ -70,14 +75,8 @@ def upgrade() -> None:
     op.execute(
         sa.text(
             "UPDATE payouts SET provider_destination_reference = CAST(freelancer_user_id AS TEXT) "
-            "WHERE provider_destination_reference IS NULL"
+            "WHERE provider = 'sandbox' AND provider_destination_reference IS NULL"
         )
-    )
-    op.alter_column(
-        "payouts",
-        "provider_destination_reference",
-        existing_type=sa.String(length=255),
-        nullable=False,
     )
 
 
