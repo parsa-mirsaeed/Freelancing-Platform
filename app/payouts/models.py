@@ -17,6 +17,43 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.extensions import db
 
 
+class PayoutProviderAccount(db.Model):  # type: ignore[name-defined,misc]
+    __tablename__ = "payout_provider_accounts"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('ACTIVE', 'DISABLED')",
+            name="ck_payout_provider_accounts_status",
+        ),
+        UniqueConstraint(
+            "freelancer_user_id",
+            "provider",
+            name="uq_payout_provider_accounts_user_provider",
+        ),
+        UniqueConstraint(
+            "provider",
+            "external_account_reference",
+            name="uq_payout_provider_accounts_provider_reference",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    freelancer_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    external_account_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ACTIVE")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+
 class Payout(db.Model):  # type: ignore[name-defined,misc]
     __tablename__ = "payouts"
     __table_args__ = (
@@ -43,6 +80,7 @@ class Payout(db.Model):  # type: ignore[name-defined,misc]
         Uuid, ForeignKey("journal_transactions.id", ondelete="RESTRICT"), nullable=True, unique=True
     )
     provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    provider_destination_reference: Mapped[str] = mapped_column(String(255), nullable=False)
     provider_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
