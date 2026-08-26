@@ -80,7 +80,9 @@ class Payout(db.Model):  # type: ignore[name-defined,misc]
         Uuid, ForeignKey("journal_transactions.id", ondelete="RESTRICT"), nullable=True, unique=True
     )
     provider: Mapped[str] = mapped_column(String(40), nullable=False)
-    provider_destination_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Nullable only for rolling-deploy compatibility with rows written by the
+    # previous sandbox-only application version. New code always snapshots it.
+    provider_destination_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     provider_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
