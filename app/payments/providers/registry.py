@@ -9,6 +9,14 @@ from app.payments.providers.stripe import StripePaymentProvider
 
 
 def get_provider(name: str) -> PaymentProvider:
+    if not bool(current_app.config["PAYMENT_RUNTIME_ENABLED"]):
+        raise ApiError(
+            "payment_runtime_disabled",
+            "Payment runtime disabled",
+            503,
+            "External payment-provider operations are disabled for this workload",
+        )
+
     normalized = name.strip().lower()
     if normalized == "sandbox":
         return SandboxPaymentProvider(
