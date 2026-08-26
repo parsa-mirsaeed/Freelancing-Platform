@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Freelancing Platform Money API
-  version: 0.5.0
+  version: 0.6.0
 paths:
   /api/v1/milestones/{milestone_id}/financials:
     get:
@@ -22,6 +22,8 @@ paths:
           description: Payment pending provider capture or reuse of the active provider attempt
         '409':
           description: Another provider already has an active funding attempt for the milestone
+        '503':
+          description: Payment runtime is disabled or provider outcome is indeterminate; retry the same idempotency key after recovery
   /api/v1/payment-intents/{payment_intent_id}/action:
     get:
       summary: Retrieve the owning employer's ephemeral provider payment action
@@ -35,10 +37,37 @@ paths:
       responses:
         '200':
           description: Provider action or null when no customer action remains
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [payment_intent_id, provider, status, action]
+                properties:
+                  payment_intent_id:
+                    type: string
+                    format: uuid
+                  provider:
+                    type: string
+                  status:
+                    type: string
+                  action:
+                    oneOf:
+                      - type: 'null'
+                      - type: object
+                        required: [kind, redirect_url]
+                        properties:
+                          kind:
+                            type: string
+                            const: redirect
+                          redirect_url:
+                            type: string
+                            format: uri
         '403':
           description: Payment intent belongs to another employer
         '404':
           description: Payment intent not found
+        '503':
+          description: Payment runtime or provider is temporarily unavailable
   /api/v1/milestones/{milestone_id}/release:
     post:
       summary: Release approved milestone escrow to wallet and platform commission
@@ -61,6 +90,8 @@ paths:
           description: Provider refund remains pending; retry with the same idempotency key
         '502':
           description: Provider refund failed and ledger reservation was reversed
+        '503':
+          description: Payment runtime is disabled
   /api/v1/payments/webhooks/{provider}:
     post:
       summary: Receive a signed provider webhook using the provider-specific signature header
@@ -77,6 +108,8 @@ paths:
           description: Signature verification failed
         '409':
           description: Event identity or commercial terms conflict
+        '503':
+          description: Payment runtime is disabled
   /api/v1/wallet:
     get:
       summary: Read freelancer balances derived from ledger entries
@@ -96,7 +129,7 @@ paths:
         '502':
           description: Provider payout failed and reservation was reversed
         '503':
-          description: Provider outcome is unknown; reservation remains pending and the same key must be retried
+          description: Payment runtime is disabled or provider outcome is unknown; reservation remains pending and the same key must be retried
   /api/v1/admin/freelancers/{freelancer_user_id}/payout-provider-accounts/{provider}:
     put:
       summary: Verify and configure a freelancer payout destination
@@ -123,6 +156,8 @@ paths:
           description: Admin role with recent MFA is required
         '409':
           description: Provider destination is not payout-ready or belongs to another freelancer
+        '503':
+          description: Payment runtime or provider is temporarily unavailable
     delete:
       summary: Disable a freelancer payout destination
       parameters:
