@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.extensions import db
 from app.payments.models import PaymentIntent
-from tests.helpers import auth_header
+from tests.helpers import auth_header, register_user
 from tests.unit.payments.test_api import _active_contract_with_milestone
 
 pytestmark = pytest.mark.unit
@@ -45,3 +45,37 @@ def test_new_idempotency_key_reuses_active_milestone_funding_attempt(
         )
     )
     assert len(pending) == 1
+
+
+def test_payment_action_is_visible_only_to_the_employer_that_created_it(
+    client,  # type: ignore[no-untyped-def]
+) -> None:
+    employer, _freelancer, _project, milestone_id = _active_contract_with_milestone(
+        client,
+        suffix="payment-action-owner",
+    )
+    other_employer = register_user(
+        client,
+        email="payment-action-other@example.com",
+        role="employer",
+    )
+    created = client.post(
+        f"/api/v1/milestones/{milestone_id}/fund",
+        headers={**auth_header(employer), "Idempotency-Key": "payment-action-owner"},
+        json={"provider": "sandbox"},
+    )
+    assert created.status_code == 202
+    payment_intent_id = created.get_json()["payment_intent_id"]
+
+    denied = client.get(
+        f"/api/v1/payment-intents/{payment_intent_id}/action",
+        headers=auth_header(other_employer),
+    )
+    assert denied.status_code == 403
+
+    allowed = client.get(
+        f"/api/v1/payment-intents/{payment_intent_id}/action",
+        headers=auth_header(employer),
+    )
+    assert allowed.status_code == 200
+    assert allowed.get_json()["action"] is None
