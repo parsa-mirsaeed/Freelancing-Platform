@@ -47,6 +47,29 @@ def test_new_idempotency_key_reuses_active_milestone_funding_attempt(
     assert len(pending) == 1
 
 
+def test_payment_runtime_kill_switch_fails_closed_before_provider_call(
+    client,
+    app,
+) -> None:  # type: ignore[no-untyped-def]
+    employer, _freelancer, _project, milestone_id = _active_contract_with_milestone(
+        client,
+        suffix="payment-runtime-disabled",
+    )
+    app.config["PAYMENT_RUNTIME_ENABLED"] = False
+
+    response = client.post(
+        f"/api/v1/milestones/{milestone_id}/fund",
+        headers={**auth_header(employer), "Idempotency-Key": "disabled-funding"},
+        json={"provider": "sandbox"},
+    )
+
+    assert response.status_code == 503
+    assert response.get_json()["type"] == "payment_runtime_disabled"
+    assert db.session.scalar(
+        select(PaymentIntent).where(PaymentIntent.milestone_id == uuid.UUID(milestone_id))
+    ) is None
+
+
 def test_payment_action_is_visible_only_to_the_employer_that_created_it(
     client,  # type: ignore[no-untyped-def]
 ) -> None:
