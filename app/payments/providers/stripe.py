@@ -23,7 +23,7 @@ from app.payments.providers.base import (
 
 
 class StripePaymentProvider:
-    """Stripe adapter that keeps Stripe resource details behind the provider boundary."""
+    """Hosted Stripe Checkout adapter behind the provider-neutral money boundary."""
 
     name = "stripe"
     webhook_signature_header = "Stripe-Signature"
@@ -32,20 +32,24 @@ class StripePaymentProvider:
         self,
         *,
         secret_key: str,
-        publishable_key: str,
         webhook_secret: str,
+        checkout_success_url: str,
+        checkout_cancel_url: str,
         max_network_retries: int = 2,
         client: Any | None = None,
     ) -> None:
         if not secret_key:
             raise RuntimeError("STRIPE_SECRET_KEY is required for the Stripe provider")
-        if not publishable_key:
-            raise RuntimeError("STRIPE_PUBLISHABLE_KEY is required for the Stripe provider")
         if not webhook_secret:
             raise RuntimeError("STRIPE_WEBHOOK_SECRET is required for the Stripe provider")
+        if not checkout_success_url:
+            raise RuntimeError("STRIPE_CHECKOUT_SUCCESS_URL is required for the Stripe provider")
+        if not checkout_cancel_url:
+            raise RuntimeError("STRIPE_CHECKOUT_CANCEL_URL is required for the Stripe provider")
         self._secret_key = secret_key
-        self._publishable_key = publishable_key
         self._webhook_secret = webhook_secret
+        self._checkout_success_url = checkout_success_url
+        self._checkout_cancel_url = checkout_cancel_url
         self._client = client or StripeClient(
             secret_key,
             max_network_retries=max_network_retries,
@@ -54,56 +58,67 @@ class StripePaymentProvider:
     def create_payment(
         self, *, amount_minor: int, currency: str, idempotency_key: str
     ) -> ProviderResult:
-        intent = self._provider_call(
-            "create payment",
-            lambda: self._client.v1.payment_intents.create(
+        session = self._provider_call(
+            "create checkout session",
+            lambda: self._client.v1.checkout.sessions.create(
                 {
-                    "amount": amount_minor,
-                    "currency": currency.lower(),
-                    "automatic_payment_methods": {"enabled": True},
+                    "mode": "payment",
+                    "success_url": self._checkout_success_url,
+                    "cancel_url": self._checkout_cancel_url,
+                    "line_items": [
+                        {
+                            "quantity": 1,
+                            "price_data": {
+                                "currency": currency.lower(),
+                                "unit_amount": amount_minor,
+                                "product_data": {"name": "Milestone escrow funding"},
+                            },
+                        }
+                    ],
                 },
                 options={"idempotency_key": idempotency_key},
             ),
         )
-        return self._payment_result(intent)
+        return self._checkout_result(session)
 
     def verify_payment(self, *, reference: str) -> ProviderResult:
-        intent = self._provider_call(
-            "verify payment",
-            lambda: self._client.v1.payment_intents.retrieve(reference),
-        )
-        return self._payment_result(intent)
+        session = self._retrieve_checkout(reference, operation="verify checkout payment")
+        return self._checkout_result(session)
 
     def get_payment_action(self, *, reference: str) -> PaymentAction | None:
-        intent = self._provider_call(
-            "retrieve payment action",
-            lambda: self._client.v1.payment_intents.retrieve(reference),
-        )
-        status = str(self._value(intent, "status", ""))
-        if status == "succeeded":
+        session = self._retrieve_checkout(reference, operation="retrieve checkout action")
+        if str(self._value(session, "payment_status", "")) == "paid":
             return None
-        client_secret = self._value(intent, "client_secret")
-        if not isinstance(client_secret, str) or not client_secret:
+        if str(self._value(session, "status", "")) == "expired":
+            raise ApiError(
+                "payment_action_expired",
+                "Payment action expired",
+                409,
+                "The Stripe Checkout session expired; start funding again with a new idempotency key",
+            )
+        redirect_url = self._value(session, "url")
+        if not isinstance(redirect_url, str) or not redirect_url:
             raise ApiError(
                 "payment_action_unavailable",
                 "Payment action unavailable",
                 409,
-                "Stripe did not return a client confirmation secret for this payment",
+                "Stripe did not return an active Checkout URL for this payment",
             )
-        return PaymentAction(
-            kind="stripe_payment_intent",
-            client_secret=client_secret,
-            publishable_key=self._publishable_key,
-        )
+        return PaymentAction(kind="redirect", redirect_url=redirect_url)
 
     def refund(
         self, *, reference: str, amount_minor: int, currency: str, idempotency_key: str
     ) -> ProviderResult:
+        session = self._retrieve_checkout(reference, operation="retrieve checkout for refund")
+        payment_intent_reference = self._resource_reference(
+            self._value(session, "payment_intent"),
+            field="payment_intent",
+        )
         refund = self._provider_call(
             "create refund",
             lambda: self._client.v1.refunds.create(
                 {
-                    "payment_intent": reference,
+                    "payment_intent": payment_intent_reference,
                     "amount": amount_minor,
                 },
                 options={"idempotency_key": idempotency_key},
@@ -211,7 +226,7 @@ class StripePaymentProvider:
         event_id = str(self._value(event, "id", ""))
         stripe_event_type = str(self._value(event, "type", ""))
         data = self._value(event, "data")
-        obj = self._value(data, "object")
+        session = self._value(data, "object")
         if not event_id or not stripe_event_type:
             raise ApiError(
                 "invalid_webhook_payload",
@@ -220,25 +235,32 @@ class StripePaymentProvider:
                 "Stripe webhook event id and type are required",
             )
 
-        if stripe_event_type == "payment_intent.succeeded":
-            reference = self._required_string(obj, "id")
-            amount = self._value(obj, "amount_received")
-            if not isinstance(amount, int) or isinstance(amount, bool) or amount <= 0:
-                amount = self._required_int(obj, "amount")
+        if stripe_event_type in {
+            "checkout.session.completed",
+            "checkout.session.async_payment_succeeded",
+        }:
+            if (
+                stripe_event_type == "checkout.session.completed"
+                and str(self._value(session, "payment_status", "")) != "paid"
+            ):
+                return VerifiedWebhook(
+                    external_event_id=event_id,
+                    event_type="payment.ignored",
+                    data={"stripe_event_type": stripe_event_type},
+                )
             return VerifiedWebhook(
                 external_event_id=event_id,
                 event_type="payment.captured",
-                data={
-                    "provider_reference": reference,
-                    "amount_minor": amount,
-                    "currency": self._required_string(obj, "currency").upper(),
-                },
+                data=self._checkout_event_data(session),
             )
-        if stripe_event_type == "payment_intent.payment_failed":
+        if stripe_event_type in {
+            "checkout.session.async_payment_failed",
+            "checkout.session.expired",
+        }:
             return VerifiedWebhook(
                 external_event_id=event_id,
                 event_type="payment.failed",
-                data={"provider_reference": self._required_string(obj, "id")},
+                data={"provider_reference": self._required_string(session, "id")},
             )
         return VerifiedWebhook(
             external_event_id=event_id,
@@ -246,13 +268,34 @@ class StripePaymentProvider:
             data={"stripe_event_type": stripe_event_type},
         )
 
-    def _payment_result(self, intent: Any) -> ProviderResult:
-        return ProviderResult(
-            reference=self._required_string(intent, "id"),
-            status=self._payment_status(str(self._value(intent, "status", ""))),
-            amount_minor=self._required_int(intent, "amount"),
-            currency=self._required_string(intent, "currency").upper(),
+    def _retrieve_checkout(self, reference: str, *, operation: str) -> Any:
+        return self._provider_call(
+            operation,
+            lambda: self._client.v1.checkout.sessions.retrieve(reference),
         )
+
+    def _checkout_result(self, session: Any) -> ProviderResult:
+        return ProviderResult(
+            reference=self._required_string(session, "id"),
+            status=self._checkout_status(session),
+            amount_minor=self._required_int(session, "amount_total"),
+            currency=self._required_string(session, "currency").upper(),
+        )
+
+    def _checkout_event_data(self, session: Any) -> dict[str, object]:
+        amount_minor = self._required_int(session, "amount_total")
+        if amount_minor <= 0:
+            raise ApiError(
+                "provider_response_invalid",
+                "Invalid provider response",
+                502,
+                "Stripe Checkout amount must be positive",
+            )
+        return {
+            "provider_reference": self._required_string(session, "id"),
+            "amount_minor": amount_minor,
+            "currency": self._required_string(session, "currency").upper(),
+        }
 
     def _refund_result(
         self, refund: Any, *, fallback_currency: str | None = None
@@ -272,11 +315,11 @@ class StripePaymentProvider:
             currency=currency.upper(),
         )
 
-    @staticmethod
-    def _payment_status(status: str) -> str:
-        if status == "succeeded":
+    @classmethod
+    def _checkout_status(cls, session: Any) -> str:
+        if str(cls._value(session, "payment_status", "")) == "paid":
             return "CAPTURED"
-        if status == "canceled":
+        if str(cls._value(session, "status", "")) == "expired":
             return "CANCELLED"
         return "PENDING"
 
@@ -287,6 +330,22 @@ class StripePaymentProvider:
         if status in {"failed", "canceled"}:
             return "FAILED"
         return "PENDING"
+
+    @classmethod
+    def _resource_reference(cls, value: Any, *, field: str) -> str:
+        if isinstance(value, str) and value:
+            return value
+        if isinstance(value, Mapping):
+            return cls._required_string(value, "id")
+        candidate = getattr(value, "id", None)
+        if isinstance(candidate, str) and candidate:
+            return candidate
+        raise ApiError(
+            "provider_response_invalid",
+            "Invalid provider response",
+            502,
+            f"Stripe Checkout response is missing {field}",
+        )
 
     @staticmethod
     def _value(obj: Any, key: str, default: object | None = None) -> Any:
