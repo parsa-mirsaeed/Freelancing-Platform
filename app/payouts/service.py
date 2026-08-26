@@ -61,6 +61,7 @@ def create_payout(
         terminal = _complete_terminal_replay(payout, idem)
         if terminal is not None:
             return terminal
+        _upgrade_legacy_destination_snapshot(payout)
     else:
         provider_destination_reference = resolve_payout_destination(
             freelancer_user_id=user.id,
@@ -119,21 +120,28 @@ def create_payout(
         )
         db.session.commit()
 
+    destination = payout.provider_destination_reference
+    if destination is None:
+        raise RuntimeError("Pending payout is missing its provider destination snapshot")
+    payout_id = payout.id
     provider = get_provider(payout.provider)
     try:
         result = provider.payout(
-            user_reference=payout.provider_destination_reference,
+            user_reference=destination,
             amount_minor=payout.amount_minor,
             currency=payout.currency,
             idempotency_key=idempotency_key,
         )
     except ProviderTemporaryError:
         db.session.rollback()
-        return _pending_payout_body(payout), 503
+        persisted = db.session.get(Payout, payout_id)
+        if persisted is None:
+            raise RuntimeError("Reserved payout disappeared")
+        return _pending_payout_body(persisted), 503
     except Exception:
-        return _fail_payout(payout.id, actor_user_id=user.id)
+        return _fail_payout(payout_id, actor_user_id=user.id)
 
-    payout = db.session.scalar(select(Payout).where(Payout.id == payout.id).with_for_update())
+    payout = db.session.scalar(select(Payout).where(Payout.id == payout_id).with_for_update())
     if payout is None:
         raise RuntimeError("Reserved payout disappeared")
     if payout.status != "PENDING":
@@ -174,6 +182,15 @@ def create_payout(
     complete_idempotency(persisted_idem, status=200, body=body)
     db.session.commit()
     return body, 200
+
+
+def _upgrade_legacy_destination_snapshot(payout: Payout) -> None:
+    if payout.provider_destination_reference is not None:
+        return
+    if payout.provider != "sandbox":
+        raise RuntimeError("Real-provider payout is missing its immutable destination snapshot")
+    payout.provider_destination_reference = str(payout.freelancer_user_id)
+    db.session.commit()
 
 
 def _complete_terminal_replay(
