@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Freelancing Platform Money API
-  version: 0.4.0
+  version: 0.5.0
 paths:
   /api/v1/milestones/{milestone_id}/financials:
     get:
@@ -13,13 +13,32 @@ paths:
           description: Financial state
   /api/v1/milestones/{milestone_id}/fund:
     post:
-      summary: Create an idempotent provider payment for milestone funding
+      summary: Create or reuse the single active idempotent provider funding attempt
       parameters:
         - $ref: '#/components/parameters/MilestoneId'
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '202':
-          description: Payment pending provider capture or idempotent replay of the original request
+          description: Payment pending provider capture or reuse of the active provider attempt
+        '409':
+          description: Another provider already has an active funding attempt for the milestone
+  /api/v1/payment-intents/{payment_intent_id}/action:
+    get:
+      summary: Retrieve the owning employer's ephemeral provider payment action
+      parameters:
+        - name: payment_intent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Provider action or null when no customer action remains
+        '403':
+          description: Payment intent belongs to another employer
+        '404':
+          description: Payment intent not found
   /api/v1/milestones/{milestone_id}/release:
     post:
       summary: Release approved milestone escrow to wallet and platform commission
@@ -37,12 +56,14 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
-          description: Refund succeeded or idempotent replay
+          description: Refund succeeded or terminal idempotent replay
+        '202':
+          description: Provider refund remains pending; retry with the same idempotency key
         '502':
           description: Provider refund failed and ledger reservation was reversed
   /api/v1/payments/webhooks/{provider}:
     post:
-      summary: Receive a signed provider webhook
+      summary: Receive a signed provider webhook using the provider-specific signature header
       parameters:
         - name: provider
           in: path
@@ -69,11 +90,51 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
-          description: Payout succeeded or idempotent replay
+          description: Payout succeeded or terminal idempotent replay
         '409':
-          description: Insufficient wallet balance
+          description: Insufficient balance or payout destination is not configured
         '502':
           description: Provider payout failed and reservation was reversed
+        '503':
+          description: Provider outcome is unknown; reservation remains pending and the same key must be retried
+  /api/v1/admin/freelancers/{freelancer_user_id}/payout-provider-accounts/{provider}:
+    put:
+      summary: Verify and configure a freelancer payout destination
+      parameters:
+        - $ref: '#/components/parameters/FreelancerUserId'
+        - $ref: '#/components/parameters/ProviderName'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [external_account_reference]
+              additionalProperties: false
+              properties:
+                external_account_reference:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+      responses:
+        '200':
+          description: Verified provider account configured and active
+        '403':
+          description: Admin role with recent MFA is required
+        '409':
+          description: Provider destination is not payout-ready or belongs to another freelancer
+    delete:
+      summary: Disable a freelancer payout destination
+      parameters:
+        - $ref: '#/components/parameters/FreelancerUserId'
+        - $ref: '#/components/parameters/ProviderName'
+      responses:
+        '200':
+          description: Provider account disabled
+        '403':
+          description: Admin role with recent MFA is required
+        '404':
+          description: Provider account not found
 components:
   parameters:
     MilestoneId:
@@ -83,6 +144,21 @@ components:
       schema:
         type: string
         format: uuid
+    FreelancerUserId:
+      name: freelancer_user_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProviderName:
+      name: provider
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 40
     IdempotencyKey:
       name: Idempotency-Key
       in: header
