@@ -23,10 +23,15 @@ export function StripePayment({
   const stripeRef = useRef<StripeInstance | null>(null);
   const elementsRef = useRef<StripeElements | null>(null);
   const paymentElementRef = useRef<StripePaymentElement | null>(null);
+  const onProviderConfirmationRef = useRef(onProviderConfirmation);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("Loading secure payment fields…");
+
+  useEffect(() => {
+    onProviderConfirmationRef.current = onProviderConfirmation;
+  }, [onProviderConfirmation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +43,7 @@ export function StripePayment({
         if (cancelled) return;
         if (!result.action) {
           setMessage("Provider already reports this payment as complete. Refreshing escrow state…");
-          await onProviderConfirmation();
+          await onProviderConfirmationRef.current();
           return;
         }
         if (result.action.kind !== "stripe_payment_intent") {
@@ -70,7 +75,7 @@ export function StripePayment({
       elementsRef.current = null;
       stripeRef.current = null;
     };
-  }, [onProviderConfirmation, paymentIntentId]);
+  }, [paymentIntentId]);
 
   async function confirmPayment() {
     const stripe = stripeRef.current;
@@ -94,7 +99,7 @@ export function StripePayment({
           ? "Stripe confirmed the payment. Waiting for the signed webhook to fund escrow."
           : "Payment submitted. Waiting for Stripe to reach a terminal state.",
       );
-      await onProviderConfirmation();
+      await onProviderConfirmationRef.current();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to confirm Stripe payment.");
     } finally {
