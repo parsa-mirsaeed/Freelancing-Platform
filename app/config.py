@@ -125,10 +125,14 @@ class Settings:
         }
         pii_encryption_keys = os.getenv("PII_ENCRYPTION_KEYS", "").strip()
         pii_lookup_key = os.getenv("PII_LOOKUP_KEY", "").strip()
-        payment_default_provider = os.getenv(
-            "PAYMENT_DEFAULT_PROVIDER",
-            "stripe" if environment == "production" else "sandbox",
-        ).strip().casefold()
+        payment_default_provider = (
+            os.getenv(
+                "PAYMENT_DEFAULT_PROVIDER",
+                "stripe" if environment == "production" else "sandbox",
+            )
+            .strip()
+            .casefold()
+        )
         payment_runtime_enabled = _env_bool(
             "PAYMENT_RUNTIME_ENABLED",
             default=environment != "production",

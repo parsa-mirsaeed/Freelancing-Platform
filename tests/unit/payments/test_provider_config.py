@@ -17,7 +17,7 @@ def _production_identity_config(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("SECRET_KEY", "production-secret-with-sufficient-entropy")
     monkeypatch.setenv("PII_ENCRYPTION_KEYS", f"primary:{_key(b'e')}")
-    monkeypatch.setenv("PII_LOOKUP_KEY", _key(b'l'))
+    monkeypatch.setenv("PII_LOOKUP_KEY", _key(b"l"))
 
 
 def test_payment_disabled_production_workload_does_not_require_stripe_secrets(

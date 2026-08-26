@@ -113,9 +113,7 @@ def test_paid_checkout_has_no_follow_up_action() -> None:
         "currency": "usd",
         "url": None,
     }
-    provider = _provider(
-        FakeStripeClient(checkout_sessions=FakeEndpoint(retrieve_result=session))
-    )
+    provider = _provider(FakeStripeClient(checkout_sessions=FakeEndpoint(retrieve_result=session)))
 
     assert provider.get_payment_action(reference="cs_test_paid") is None
 
@@ -129,9 +127,7 @@ def test_expired_checkout_requires_a_new_funding_attempt() -> None:
         "currency": "usd",
         "url": None,
     }
-    provider = _provider(
-        FakeStripeClient(checkout_sessions=FakeEndpoint(retrieve_result=session))
-    )
+    provider = _provider(FakeStripeClient(checkout_sessions=FakeEndpoint(retrieve_result=session)))
 
     with pytest.raises(ApiError, match="Payment action expired"):
         provider.get_payment_action(reference="cs_test_expired")
@@ -196,9 +192,7 @@ def test_unpaid_checkout_completion_waits_for_async_success(
 
 def test_connected_account_is_verified_before_transfer() -> None:
     accounts = FakeEndpoint(retrieve_result={"id": "acct_ready", "payouts_enabled": True})
-    transfers = FakeEndpoint(
-        create_result={"id": "tr_123", "amount": 4000, "currency": "usd"}
-    )
+    transfers = FakeEndpoint(create_result={"id": "tr_123", "amount": 4000, "currency": "usd"})
     provider = _provider(FakeStripeClient(accounts=accounts, transfers=transfers))
 
     assert provider.validate_payout_destination(reference="acct_ready") == "acct_ready"
@@ -249,9 +243,7 @@ def test_pending_refund_can_be_verified_without_creating_a_second_refund() -> No
             "currency": "usd",
         },
     )
-    provider = _provider(
-        FakeStripeClient(checkout_sessions=checkout_sessions, refunds=refunds)
-    )
+    provider = _provider(FakeStripeClient(checkout_sessions=checkout_sessions, refunds=refunds))
 
     created = provider.refund(
         reference="cs_test_123",

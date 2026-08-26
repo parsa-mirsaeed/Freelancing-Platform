@@ -46,9 +46,7 @@ def post_payout():  # type: ignore[no-untyped-def]
     "/admin/freelancers/<uuid:freelancer_user_id>/payout-provider-accounts/<provider_name>"
 )
 @require_roles("admin")
-def put_payout_provider_account(
-    freelancer_user_id: uuid.UUID, provider_name: str
-):  # type: ignore[no-untyped-def]
+def put_payout_provider_account(freelancer_user_id: uuid.UUID, provider_name: str):  # type: ignore[no-untyped-def]
     administrator: User = g.current_user
     payload = require_json_object(request)
     body = configure_payout_provider_account(
@@ -68,9 +66,7 @@ def put_payout_provider_account(
     "/admin/freelancers/<uuid:freelancer_user_id>/payout-provider-accounts/<provider_name>"
 )
 @require_roles("admin")
-def delete_payout_provider_account(
-    freelancer_user_id: uuid.UUID, provider_name: str
-):  # type: ignore[no-untyped-def]
+def delete_payout_provider_account(freelancer_user_id: uuid.UUID, provider_name: str):  # type: ignore[no-untyped-def]
     administrator: User = g.current_user
     body = disable_payout_provider_account(
         administrator=administrator,

@@ -63,10 +63,7 @@ def test_admin_can_configure_and_disable_verified_payout_destination(
         lambda _name: FakeProvider(),
     )
 
-    path = (
-        "/api/v1/admin/freelancers/"
-        f"{freelancer['user']['id']}/payout-provider-accounts/stripe"
-    )
+    path = f"/api/v1/admin/freelancers/{freelancer['user']['id']}/payout-provider-accounts/stripe"
     configured = client.put(
         path,
         headers=auth_header(admin),
@@ -81,8 +78,7 @@ def test_admin_can_configure_and_disable_verified_payout_destination(
     with app.app_context():
         account = db.session.scalar(
             select(PayoutProviderAccount).where(
-                PayoutProviderAccount.freelancer_user_id
-                == uuid.UUID(freelancer["user"]["id"]),
+                PayoutProviderAccount.freelancer_user_id == uuid.UUID(freelancer["user"]["id"]),
                 PayoutProviderAccount.provider == "stripe",
             )
         )
@@ -114,10 +110,7 @@ def test_non_admin_cannot_configure_payout_destination(
         lambda _name: FakeProvider(),
     )
     response = client.put(
-        (
-            "/api/v1/admin/freelancers/"
-            f"{freelancer['user']['id']}/payout-provider-accounts/stripe"
-        ),
+        (f"/api/v1/admin/freelancers/{freelancer['user']['id']}/payout-provider-accounts/stripe"),
         headers=auth_header(employer),
         json={"external_account_reference": "acct_verified"},
     )

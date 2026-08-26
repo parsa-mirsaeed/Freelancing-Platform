@@ -113,7 +113,7 @@ test("employer creates one idempotent funding request and waits for provider cap
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(finance) }),
   );
   await page.route(`**/api/backend/milestones/${milestoneId}/fund`, async (route) => {
-    expect(route.request().postDataJSON()).toEqual({ provider: "sandbox" });
+    expect(route.request().postDataJSON()).toEqual({});
     expect(route.request().headers()["idempotency-key"]).toBeTruthy();
     await route.fulfill({
       status: 202,
@@ -193,7 +193,7 @@ test("employer can fully refund funded escrow only before work starts", async ({
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(finance) }),
   );
   await page.route(`**/api/backend/milestones/${milestoneId}/refund`, async (route) => {
-    expect(route.request().postDataJSON()).toEqual({ provider: "sandbox" });
+    expect(route.request().postDataJSON()).toEqual({});
     expect(route.request().headers()["idempotency-key"]).toBeTruthy();
     finance = financial("CREATED", 0, 1000);
     contractState = contract("CREATED");
@@ -238,7 +238,6 @@ test("freelancer payout re-reads ledger balance after backend success", async ({
     expect(route.request().postDataJSON()).toEqual({
       amount_minor: 5500,
       currency: "USD",
-      provider: "sandbox",
     });
     expect(route.request().headers()["idempotency-key"]).toBeTruthy();
     wallet = { balances: { USD: 3500 } };

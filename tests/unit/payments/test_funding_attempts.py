@@ -65,9 +65,12 @@ def test_payment_runtime_kill_switch_fails_closed_before_provider_call(
 
     assert response.status_code == 503
     assert response.get_json()["type"] == "payment_runtime_disabled"
-    assert db.session.scalar(
-        select(PaymentIntent).where(PaymentIntent.milestone_id == uuid.UUID(milestone_id))
-    ) is None
+    assert (
+        db.session.scalar(
+            select(PaymentIntent).where(PaymentIntent.milestone_id == uuid.UUID(milestone_id))
+        )
+        is None
+    )
 
 
 def test_payment_action_is_visible_only_to_the_employer_that_created_it(
