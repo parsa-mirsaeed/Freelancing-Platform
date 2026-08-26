@@ -1,12 +1,25 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
-from stripe import SignatureVerificationError, StripeClient, Webhook
+from stripe import (
+    APIConnectionError,
+    APIError as StripeAPIError,
+    RateLimitError,
+    SignatureVerificationError,
+    StripeClient,
+    StripeError,
+    Webhook,
+)
 
 from app.errors import ApiError
-from app.payments.providers.base import PaymentAction, ProviderResult, VerifiedWebhook
+from app.payments.providers.base import (
+    PaymentAction,
+    ProviderResult,
+    ProviderTemporaryError,
+    VerifiedWebhook,
+)
 
 
 class StripePaymentProvider:
@@ -41,21 +54,31 @@ class StripePaymentProvider:
     def create_payment(
         self, *, amount_minor: int, currency: str, idempotency_key: str
     ) -> ProviderResult:
-        intent = self._client.v1.payment_intents.create(
-            {
-                "amount": amount_minor,
-                "currency": currency.lower(),
-                "automatic_payment_methods": {"enabled": True},
-            },
-            options={"idempotency_key": idempotency_key},
+        intent = self._provider_call(
+            "create payment",
+            lambda: self._client.v1.payment_intents.create(
+                {
+                    "amount": amount_minor,
+                    "currency": currency.lower(),
+                    "automatic_payment_methods": {"enabled": True},
+                },
+                options={"idempotency_key": idempotency_key},
+            ),
         )
         return self._payment_result(intent)
 
     def verify_payment(self, *, reference: str) -> ProviderResult:
-        return self._payment_result(self._client.v1.payment_intents.retrieve(reference))
+        intent = self._provider_call(
+            "verify payment",
+            lambda: self._client.v1.payment_intents.retrieve(reference),
+        )
+        return self._payment_result(intent)
 
     def get_payment_action(self, *, reference: str) -> PaymentAction | None:
-        intent = self._client.v1.payment_intents.retrieve(reference)
+        intent = self._provider_call(
+            "retrieve payment action",
+            lambda: self._client.v1.payment_intents.retrieve(reference),
+        )
         status = str(self._value(intent, "status", ""))
         if status == "succeeded":
             return None
@@ -76,17 +99,23 @@ class StripePaymentProvider:
     def refund(
         self, *, reference: str, amount_minor: int, currency: str, idempotency_key: str
     ) -> ProviderResult:
-        refund = self._client.v1.refunds.create(
-            {
-                "payment_intent": reference,
-                "amount": amount_minor,
-            },
-            options={"idempotency_key": idempotency_key},
+        refund = self._provider_call(
+            "create refund",
+            lambda: self._client.v1.refunds.create(
+                {
+                    "payment_intent": reference,
+                    "amount": amount_minor,
+                },
+                options={"idempotency_key": idempotency_key},
+            ),
         )
         return self._refund_result(refund, fallback_currency=currency)
 
     def verify_refund(self, *, reference: str) -> ProviderResult:
-        refund = self._client.v1.refunds.retrieve(reference)
+        refund = self._provider_call(
+            "verify refund",
+            lambda: self._client.v1.refunds.retrieve(reference),
+        )
         return self._refund_result(refund)
 
     def payout(
@@ -99,13 +128,16 @@ class StripePaymentProvider:
                 409,
                 "Stripe payouts require a verified connected-account destination",
             )
-        transfer = self._client.v1.transfers.create(
-            {
-                "amount": amount_minor,
-                "currency": currency.lower(),
-                "destination": user_reference,
-            },
-            options={"idempotency_key": idempotency_key},
+        transfer = self._provider_call(
+            "create transfer",
+            lambda: self._client.v1.transfers.create(
+                {
+                    "amount": amount_minor,
+                    "currency": currency.lower(),
+                    "destination": user_reference,
+                },
+                options={"idempotency_key": idempotency_key},
+            ),
         )
         return ProviderResult(
             reference=self._required_string(transfer, "id"),
@@ -258,3 +290,17 @@ class StripePaymentProvider:
                 f"Stripe response has an invalid {key}",
             )
         return value
+
+    @staticmethod
+    def _provider_call(operation: str, request: Callable[[], Any]) -> Any:
+        try:
+            return request()
+        except (APIConnectionError, StripeAPIError, RateLimitError) as exc:
+            raise ProviderTemporaryError(f"Stripe could not {operation}; retry is safe") from exc
+        except StripeError as exc:
+            raise ApiError(
+                "payment_provider_error",
+                "Payment provider error",
+                502,
+                f"Stripe could not {operation}",
+            ) from exc
