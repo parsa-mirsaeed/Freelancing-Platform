@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from typing import Protocol
 
 
+class ProviderTemporaryError(RuntimeError):
+    """The provider outcome is unknown and the same idempotency key must be retried."""
+
+
 @dataclass(frozen=True, slots=True)
 class ProviderResult:
     reference: str
