@@ -17,8 +17,9 @@ def get_provider(name: str) -> PaymentProvider:
     if normalized == "stripe":
         return StripePaymentProvider(
             secret_key=str(current_app.config["STRIPE_SECRET_KEY"]),
-            publishable_key=str(current_app.config["STRIPE_PUBLISHABLE_KEY"]),
             webhook_secret=str(current_app.config["STRIPE_WEBHOOK_SECRET"]),
+            checkout_success_url=str(current_app.config["STRIPE_CHECKOUT_SUCCESS_URL"]),
+            checkout_cancel_url=str(current_app.config["STRIPE_CHECKOUT_CANCEL_URL"]),
             max_network_retries=int(current_app.config["STRIPE_MAX_NETWORK_RETRIES"]),
         )
     raise ApiError(
