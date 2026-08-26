@@ -132,11 +132,11 @@ def create_payout(
             currency=payout.currency,
             idempotency_key=idempotency_key,
         )
-    except ProviderTemporaryError:
+    except ProviderTemporaryError as exc:
         db.session.rollback()
         persisted = db.session.get(Payout, payout_id)
         if persisted is None:
-            raise RuntimeError("Reserved payout disappeared")
+            raise RuntimeError("Reserved payout disappeared") from exc
         return _pending_payout_body(persisted), 503
     except Exception:
         return _fail_payout(payout_id, actor_user_id=user.id)
