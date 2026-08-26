@@ -155,19 +155,21 @@ export function MilestoneMoney({
       idempotencyKeys.current[action] = undefined;
       if (action === "fund" && isPaymentIntent(result) && result.status === "PENDING") {
         setPendingFunding(true);
-        setStripePaymentIntentId(
-          result.provider === "stripe" ? result.payment_intent_id : null,
-        );
+        setStripePaymentIntentId(result.provider === "stripe" ? result.payment_intent_id : null);
       }
       await refreshAfterProviderConfirmation();
       if (action === "fund") {
-        setMessage(
-          isPaymentIntent(result) && result.status === "CAPTURED"
-            ? `Backend confirmed ${amount} in funded escrow.`
-            : result.provider === "stripe"
-              ? `Stripe funding is ready for ${amount}. Complete the secure payment form below; escrow remains pending until the signed webhook is processed.`
-              : `Funding request accepted for ${amount}. Escrow remains pending until provider capture is confirmed.`,
-        );
+        if (isPaymentIntent(result)) {
+          setMessage(
+            result.status === "CAPTURED"
+              ? `Backend confirmed ${amount} in funded escrow.`
+              : result.provider === "stripe"
+                ? `Stripe funding is ready for ${amount}. Complete the secure payment form below; escrow remains pending until the signed webhook is processed.`
+                : `Funding request accepted for ${amount}. Escrow remains pending until provider capture is confirmed.`,
+          );
+        } else {
+          setMessage(`Funding state refreshed for ${amount}.`);
+        }
       } else if (action === "release") {
         setMessage(`Backend confirmed release of ${amount}.`);
       } else {
