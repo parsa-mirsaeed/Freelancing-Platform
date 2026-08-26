@@ -19,6 +19,7 @@ from app.ledger.service import (
 )
 from app.payments.idempotency import claim_idempotency, complete_idempotency
 from app.payments.models import FinancialIdempotencyKey
+from app.payments.providers.base import ProviderTemporaryError
 from app.payments.providers.registry import get_provider
 from app.payouts.models import Payout
 
@@ -120,6 +121,9 @@ def create_payout(
             currency=payout.currency,
             idempotency_key=idempotency_key,
         )
+    except ProviderTemporaryError:
+        db.session.rollback()
+        return _pending_payout_body(payout), 503
     except Exception:
         return _fail_payout(payout.id, actor_user_id=user.id)
 
@@ -238,6 +242,16 @@ def _fail_payout(
     complete_idempotency(persisted_idem, status=502, body=body)
     db.session.commit()
     return body, 502
+
+
+def _pending_payout_body(payout: Payout) -> dict[str, object]:
+    return {
+        "type": "payment_provider_temporarily_unavailable",
+        "title": "Payment provider temporarily unavailable",
+        "status": 503,
+        "detail": "Payout outcome is unknown; retry with the same Idempotency-Key",
+        "payout_id": str(payout.id),
+    }
 
 
 def _failed_payout_body(payout: Payout) -> dict[str, object]:
