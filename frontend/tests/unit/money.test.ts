@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  CURRENT_PAYMENT_PROVIDER,
   canOfferFinancialAction,
   financialActionAmount,
   getPaymentAction,
@@ -135,19 +134,19 @@ describe("money affordances", () => {
 });
 
 describe("money mutations", () => {
-  it("sends fund and refund through the configured provider with caller-owned idempotency", async () => {
+  it("lets the backend choose the payment provider when no public override is configured", async () => {
     await mutateMilestoneFinancials("milestone-1", "fund", "fund-key");
     expect(productJson).toHaveBeenLastCalledWith("milestones/milestone-1/fund", {
       method: "POST",
       headers: { "Idempotency-Key": "fund-key" },
-      body: JSON.stringify({ provider: CURRENT_PAYMENT_PROVIDER }),
+      body: JSON.stringify({}),
     });
 
     await mutateMilestoneFinancials("milestone-1", "refund", "refund-key");
     expect(productJson).toHaveBeenLastCalledWith("milestones/milestone-1/refund", {
       method: "POST",
       headers: { "Idempotency-Key": "refund-key" },
-      body: JSON.stringify({ provider: CURRENT_PAYMENT_PROVIDER }),
+      body: JSON.stringify({}),
     });
   });
 
@@ -173,7 +172,6 @@ describe("money mutations", () => {
       body: JSON.stringify({
         amount_minor: 5500,
         currency: "USD",
-        provider: CURRENT_PAYMENT_PROVIDER,
       }),
     });
   });
