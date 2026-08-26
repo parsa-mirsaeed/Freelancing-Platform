@@ -80,7 +80,11 @@ class SandboxPaymentProvider:
         return self.verify_payment(reference=reference)
 
     def verify_webhook(self, *, payload: bytes, signature: str) -> VerifiedWebhook:
-        expected = hmac.new(self._webhook_secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+        expected = hmac.new(
+            self._webhook_secret.encode("utf-8"),
+            payload,
+            hashlib.sha256,
+        ).hexdigest()
         if not hmac.compare_digest(expected, signature):
             raise ApiError(
                 "invalid_webhook_signature",
