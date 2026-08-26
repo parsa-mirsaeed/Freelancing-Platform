@@ -13,6 +13,13 @@ class ProviderResult:
 
 
 @dataclass(frozen=True, slots=True)
+class PaymentAction:
+    kind: str
+    client_secret: str
+    publishable_key: str
+
+
+@dataclass(frozen=True, slots=True)
 class VerifiedWebhook:
     external_event_id: str
     event_type: str
@@ -21,12 +28,15 @@ class VerifiedWebhook:
 
 class PaymentProvider(Protocol):
     name: str
+    webhook_signature_header: str
 
     def create_payment(
         self, *, amount_minor: int, currency: str, idempotency_key: str
     ) -> ProviderResult: ...
 
     def verify_payment(self, *, reference: str) -> ProviderResult: ...
+
+    def get_payment_action(self, *, reference: str) -> PaymentAction | None: ...
 
     def refund(
         self, *, reference: str, amount_minor: int, currency: str, idempotency_key: str
