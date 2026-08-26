@@ -5,12 +5,14 @@ from typing import Any
 
 from stripe import (
     APIConnectionError,
-    APIError as StripeAPIError,
     RateLimitError,
     SignatureVerificationError,
     StripeClient,
     StripeError,
     Webhook,
+)
+from stripe import (
+    APIError as StripeAPIError,
 )
 
 from app.errors import ApiError
@@ -102,7 +104,8 @@ class StripePaymentProvider:
                 "payment_action_expired",
                 "Payment action expired",
                 409,
-                "The Stripe Checkout session expired; start funding again with a new idempotency key",
+                "The Stripe Checkout session expired; start funding again with a new "
+                "idempotency key",
             )
         redirect_url = self._value(session, "url")
         if not isinstance(redirect_url, str) or not redirect_url:
