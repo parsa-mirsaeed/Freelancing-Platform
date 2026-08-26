@@ -1,7 +1,8 @@
 import type { ContractStatus, MemberRole, MilestoneStatus } from "@/lib/api/contracts";
 import { productJson } from "@/lib/api/product-client";
 
-export const CURRENT_PAYMENT_PROVIDER = "sandbox";
+export const CURRENT_PAYMENT_PROVIDER =
+  process.env.NEXT_PUBLIC_PAYMENT_PROVIDER?.trim().toLowerCase() || "sandbox";
 
 export interface MilestoneFinancialState {
   milestone_id: string;
@@ -20,6 +21,17 @@ export interface PaymentIntentResult {
   amount_minor: number;
   currency: string;
   status: string;
+}
+
+export interface PaymentActionResult {
+  payment_intent_id: string;
+  provider: string;
+  status: string;
+  action: null | {
+    kind: "stripe_payment_intent" | string;
+    client_secret: string;
+    publishable_key: string;
+  };
 }
 
 export interface RefundResult {
@@ -108,6 +120,10 @@ export function mutateMilestoneFinancials(
         ? JSON.stringify({ provider: CURRENT_PAYMENT_PROVIDER })
         : undefined,
   });
+}
+
+export function getPaymentAction(paymentIntentId: string): Promise<PaymentActionResult> {
+  return productJson<PaymentActionResult>(`payments/${paymentIntentId}/action`);
 }
 
 export function getWallet(signal?: AbortSignal): Promise<WalletBalances> {
