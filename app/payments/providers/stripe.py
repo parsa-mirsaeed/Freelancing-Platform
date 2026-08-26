@@ -118,6 +118,35 @@ class StripePaymentProvider:
         )
         return self._refund_result(refund)
 
+    def validate_payout_destination(self, *, reference: str) -> str:
+        if not reference.startswith("acct_"):
+            raise ApiError(
+                "payout_destination_invalid",
+                "Invalid payout destination",
+                422,
+                "Stripe payout destination must be a connected account id",
+            )
+        account = self._provider_call(
+            "verify connected account",
+            lambda: self._client.v1.accounts.retrieve(reference),
+        )
+        account_id = self._required_string(account, "id")
+        if account_id != reference:
+            raise ApiError(
+                "payout_destination_invalid",
+                "Invalid payout destination",
+                422,
+                "Stripe returned a different connected account id",
+            )
+        if self._value(account, "payouts_enabled") is not True:
+            raise ApiError(
+                "payout_destination_not_ready",
+                "Payout destination not ready",
+                409,
+                "Stripe connected account is not enabled for payouts",
+            )
+        return account_id
+
     def payout(
         self, *, user_reference: str, amount_minor: int, currency: str, idempotency_key: str
     ) -> ProviderResult:
