@@ -14,6 +14,10 @@ FEATURE_FLAG_NAMES = (
     "new_dispute_engine",
 )
 _DEVELOPMENT_SECRET_KEY = "-".join(("development", "only", "change", "me"))
+_DEVELOPMENT_PAYMENT_WEBHOOK_SECRET = "-".join(
+    ("development", "only", "payment", "webhook", "secret")
+)
+_SUPPORTED_PAYMENT_PROVIDERS = {"sandbox", "stripe"}
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -77,6 +81,12 @@ class Settings:
     refresh_token_ttl_seconds: int
     pii_encryption_keys: str
     pii_lookup_key: str
+    payment_default_provider: str
+    payment_webhook_secret: str
+    stripe_secret_key: str
+    stripe_publishable_key: str
+    stripe_webhook_secret: str
+    stripe_max_network_retries: int
     max_content_length: int
     cors_allowed_origins: tuple[str, ...]
     rate_limit_enabled: bool
@@ -97,6 +107,25 @@ class Settings:
         }
         pii_encryption_keys = os.getenv("PII_ENCRYPTION_KEYS", "").strip()
         pii_lookup_key = os.getenv("PII_LOOKUP_KEY", "").strip()
+        payment_default_provider = os.getenv(
+            "PAYMENT_DEFAULT_PROVIDER",
+            "stripe" if environment == "production" else "sandbox",
+        ).strip().casefold()
+        payment_webhook_secret = os.getenv(
+            "PAYMENT_WEBHOOK_SECRET", _DEVELOPMENT_PAYMENT_WEBHOOK_SECRET
+        ).strip()
+        stripe_secret_key = os.getenv("STRIPE_SECRET_KEY", "").strip()
+        stripe_publishable_key = os.getenv("STRIPE_PUBLISHABLE_KEY", "").strip()
+        stripe_webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+        stripe_max_network_retries = int(os.getenv("STRIPE_MAX_NETWORK_RETRIES", "2"))
+
+        if payment_default_provider not in _SUPPORTED_PAYMENT_PROVIDERS:
+            raise RuntimeError(
+                "PAYMENT_DEFAULT_PROVIDER must be one of: "
+                + ", ".join(sorted(_SUPPORTED_PAYMENT_PROVIDERS))
+            )
+        if stripe_max_network_retries < 0 or stripe_max_network_retries > 5:
+            raise RuntimeError("STRIPE_MAX_NETWORK_RETRIES must be between 0 and 5")
 
         if environment == "production":
             if secret_key == _DEVELOPMENT_SECRET_KEY:
@@ -107,6 +136,22 @@ class Settings:
                 raise RuntimeError("PII_ENCRYPTION_KEYS must be configured in production")
             if not pii_lookup_key:
                 raise RuntimeError("PII_LOOKUP_KEY must be configured in production")
+            if payment_default_provider == "sandbox":
+                raise RuntimeError("PAYMENT_DEFAULT_PROVIDER cannot be sandbox in production")
+            if payment_default_provider == "stripe":
+                missing = [
+                    name
+                    for name, value in (
+                        ("STRIPE_SECRET_KEY", stripe_secret_key),
+                        ("STRIPE_PUBLISHABLE_KEY", stripe_publishable_key),
+                        ("STRIPE_WEBHOOK_SECRET", stripe_webhook_secret),
+                    )
+                    if not value
+                ]
+                if missing:
+                    raise RuntimeError(
+                        "Stripe production configuration is incomplete: " + ", ".join(missing)
+                    )
         else:
             if not pii_encryption_keys:
                 pii_encryption_keys = "local-v1:" + _derived_local_key(
@@ -140,6 +185,12 @@ class Settings:
             refresh_token_ttl_seconds=int(os.getenv("REFRESH_TOKEN_TTL_SECONDS", "2592000")),
             pii_encryption_keys=pii_encryption_keys,
             pii_lookup_key=pii_lookup_key,
+            payment_default_provider=payment_default_provider,
+            payment_webhook_secret=payment_webhook_secret,
+            stripe_secret_key=stripe_secret_key,
+            stripe_publishable_key=stripe_publishable_key,
+            stripe_webhook_secret=stripe_webhook_secret,
+            stripe_max_network_retries=stripe_max_network_retries,
             max_content_length=max_content_length,
             cors_allowed_origins=cors_allowed_origins,
             rate_limit_enabled=_env_bool(
@@ -164,6 +215,12 @@ class Settings:
             "REFRESH_TOKEN_TTL_SECONDS": self.refresh_token_ttl_seconds,
             "PII_ENCRYPTION_KEYS": self.pii_encryption_keys,
             "PII_LOOKUP_KEY": self.pii_lookup_key,
+            "PAYMENT_DEFAULT_PROVIDER": self.payment_default_provider,
+            "PAYMENT_WEBHOOK_SECRET": self.payment_webhook_secret,
+            "STRIPE_SECRET_KEY": self.stripe_secret_key,
+            "STRIPE_PUBLISHABLE_KEY": self.stripe_publishable_key,
+            "STRIPE_WEBHOOK_SECRET": self.stripe_webhook_secret,
+            "STRIPE_MAX_NETWORK_RETRIES": self.stripe_max_network_retries,
             "MAX_CONTENT_LENGTH": self.max_content_length,
             "CORS_ALLOWED_ORIGINS": self.cors_allowed_origins,
             "RATE_LIMIT_ENABLED": self.rate_limit_enabled,
