@@ -267,7 +267,7 @@ jobs:
     environment: staging
     env:
       STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
-      EXPECTED_IMAGE: ${{ env.IMAGE_REPOSITORY }}@${{ needs.validate.outputs.image_digest }}
+      IMAGE_DIGEST: ${{ needs.validate.outputs.image_digest }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -281,6 +281,7 @@ jobs:
           chmod 600 "$HOME/.kube/config"
       - name: Verify every staging workload runs the attested digest
         run: |
+          expected_image="$IMAGE_REPOSITORY@$IMAGE_DIGEST"
           for deployment in \
             freelancing-api \
             freelancing-socket \
@@ -293,8 +294,8 @@ jobs:
             celery-files; do
             actual="$(kubectl -n freelancing get "deployment/$deployment" \
               -o jsonpath='{.spec.template.spec.containers[0].image}')"
-            test "$actual" = "$EXPECTED_IMAGE" || {
-              echo "$deployment runs $actual, expected $EXPECTED_IMAGE" >&2
+            test "$actual" = "$expected_image" || {
+              echo "$deployment runs $actual, expected $expected_image" >&2
               exit 1
             }
           done
