@@ -7,7 +7,7 @@ import json
 from app.errors import ApiError
 from app.payments.providers.base import PaymentAction, ProviderResult, VerifiedWebhook
 
-_DEVELOPMENT_WEBHOOK_SECRET = "development-only-payment-webhook-secret"
+_DEVELOPMENT_WEBHOOK_SECRET = "development-only-payment-webhook-secret"  # nosec B105 - deterministic local/CI fixture, never a production credential
 
 
 class SandboxPaymentProvider:
