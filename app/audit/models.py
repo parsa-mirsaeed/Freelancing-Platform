@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Uuid, event
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, String, Uuid, event
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.extensions import db
@@ -12,6 +12,16 @@ from app.extensions import db
 
 class AuditEvent(db.Model):  # type: ignore[name-defined,misc]
     __tablename__ = "audit_events"
+    __table_args__ = (
+        CheckConstraint(
+            "previous_state_hash IS NULL OR length(previous_state_hash) = 64",
+            name="ck_audit_events_previous_state_hash_length",
+        ),
+        CheckConstraint(
+            "new_state_hash IS NULL OR length(new_state_hash) = 64",
+            name="ck_audit_events_new_state_hash_length",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -21,6 +31,8 @@ class AuditEvent(db.Model):  # type: ignore[name-defined,misc]
     resource_type: Mapped[str] = mapped_column(String(80), nullable=False)
     resource_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    previous_state_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    new_state_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     metadata_json: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSON, default=dict, nullable=False
     )
