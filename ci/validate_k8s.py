@@ -7,6 +7,10 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 K8S_DIR = ROOT / "infra" / "kubernetes"
+DEPLOYMENT_WORKFLOWS = (
+    ROOT / ".github" / "workflows" / "main.yml",
+    ROOT / ".github" / "workflows" / "release.yml",
+)
 SENSITIVE_ENV_MARKERS = (
     "SECRET",
     "PASSWORD",
@@ -119,6 +123,16 @@ def _validate_deployment(document: dict[str, Any]) -> str:
     return name
 
 
+def _validate_deployment_workflows() -> None:
+    for path in DEPLOYMENT_WORKFLOWS:
+        content = path.read_text(encoding="utf-8")
+        missing = sorted(name for name in REQUIRED_DEPLOYMENTS if f"{name}:" not in content)
+        _require(
+            not missing,
+            f"{path.relative_to(ROOT)}: deployment targets missing from rollout: {missing}",
+        )
+
+
 def main() -> None:
     documents = _documents()
     namespace_restricted = False
@@ -150,7 +164,8 @@ def main() -> None:
     missing = sorted(REQUIRED_DEPLOYMENTS - deployments)
     _require(not missing, f"required workload deployments missing: {missing}")
     _require(network_policies >= 1, "at least one NetworkPolicy required")
-    print(f"validated {len(documents)} Kubernetes resources")
+    _validate_deployment_workflows()
+    print(f"validated {len(documents)} Kubernetes resources and deployment workflows")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
+const fullMatrix = Boolean(process.env.PLAYWRIGHT_FULL_MATRIX);
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
@@ -13,10 +15,54 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
-  projects: [
-    { name: "desktop-chromium", use: { viewport: { width: 1440, height: 900 } } },
-    { name: "mobile-chromium", use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
-  ],
+  projects: fullMatrix
+    ? [
+        {
+          name: "desktop-chromium",
+          use: { browserName: "chromium", viewport: { width: 1440, height: 900 } },
+        },
+        {
+          name: "desktop-firefox",
+          use: { browserName: "firefox", viewport: { width: 1440, height: 900 } },
+        },
+        {
+          name: "desktop-webkit",
+          use: { browserName: "webkit", viewport: { width: 1440, height: 900 } },
+        },
+        {
+          name: "mobile-chromium",
+          use: {
+            browserName: "chromium",
+            viewport: { width: 390, height: 844 },
+            isMobile: true,
+            hasTouch: true,
+          },
+        },
+        {
+          name: "mobile-webkit",
+          use: {
+            browserName: "webkit",
+            viewport: { width: 390, height: 844 },
+            isMobile: true,
+            hasTouch: true,
+          },
+        },
+      ]
+    : [
+        {
+          name: "desktop-chromium",
+          use: { browserName: "chromium", viewport: { width: 1440, height: 900 } },
+        },
+        {
+          name: "mobile-chromium",
+          use: {
+            browserName: "chromium",
+            viewport: { width: 390, height: 844 },
+            isMobile: true,
+            hasTouch: true,
+          },
+        },
+      ],
   webServer: [
     {
       command: "node tests/e2e/mock-backend.mjs",

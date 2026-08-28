@@ -3,18 +3,15 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      image_digest:
-        description: "sha256 digest produced by the successful main workflow"
-        required: true
-        type: string
-      source_sha:
-        description: "main commit SHA that produced the image"
+      pre_release_run_id:
+        description: "successful Pre-release workflow run id to promote"
         required: true
         type: string
 
 permissions:
   contents: read
   packages: read
+  actions: read
 
 env:
   IMAGE_REPOSITORY: ghcr.io/parsa-mirsaeed/freelancing-platform
@@ -27,23 +24,61 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ steps.image.outputs.value }}
+      image: ${{ steps.attestation.outputs.image }}
+      source_sha: ${{ steps.attestation.outputs.source_sha }}
     steps:
-      - name: Validate immutable image identity
-        id: image
+      - name: Validate pre-release attestation and main provenance
+        id: attestation
         env:
-          DIGEST: ${{ inputs.image_digest }}
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PRE_RELEASE_RUN_ID: ${{ inputs.pre_release_run_id }}
         run: |
-          echo "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
-          echo "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
-          echo "value=$IMAGE_REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
-      - name: Verify source commit is on main
-        uses: actions/checkout@v4
+          echo "$PRE_RELEASE_RUN_ID" | grep -Eq '^[0-9]+$'
+          run_json="$(gh api "repos/$REPO/actions/runs/$PRE_RELEASE_RUN_ID")"
+          test "$(jq -r '.name' <<<"$run_json")" = "Pre-release"
+          test "$(jq -r '.event' <<<"$run_json")" = "workflow_dispatch"
+          test "$(jq -r '.conclusion' <<<"$run_json")" = "success"
+
+          mkdir -p /tmp/pre-release
+          gh run download "$PRE_RELEASE_RUN_ID" \
+            -R "$REPO" \
+            -n pre-release-attestation \
+            -D /tmp/pre-release
+          attestation=/tmp/pre-release/pre-release-attestation.json
+          test -s "$attestation"
+
+          source_sha="$(jq -r '.source_sha' "$attestation")"
+          image_digest="$(jq -r '.image_digest' "$attestation")"
+          main_run_id="$(jq -r '.main_run_id' "$attestation")"
+          recorded_pre_release="$(jq -r '.pre_release_run_id' "$attestation")"
+          echo "$source_sha" | grep -Eq '^[0-9a-f]{40}$'
+          echo "$image_digest" | grep -Eq '^sha256:[0-9a-f]{64}$'
+          echo "$main_run_id" | grep -Eq '^[0-9]+$'
+          test "$recorded_pre_release" = "$PRE_RELEASE_RUN_ID"
+
+          main_json="$(gh api "repos/$REPO/actions/runs/$main_run_id")"
+          test "$(jq -r '.name' <<<"$main_json")" = "Main"
+          test "$(jq -r '.event' <<<"$main_json")" = "push"
+          test "$(jq -r '.head_branch' <<<"$main_json")" = "main"
+          test "$(jq -r '.head_sha' <<<"$main_json")" = "$source_sha"
+          test "$(jq -r '.conclusion' <<<"$main_json")" = "success"
+
+          mkdir -p /tmp/main
+          gh run download "$main_run_id" -R "$REPO" -n release-metadata -D /tmp/main
+          metadata=/tmp/main/release-metadata.json
+          test "$(jq -r '.source_sha' "$metadata")" = "$source_sha"
+          test "$(jq -r '.image_digest' "$metadata")" = "$image_digest"
+          test "$(jq -r '.main_run_id' "$metadata")" = "$main_run_id"
+
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE_REPOSITORY@$image_digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+      - name: Verify attested source commit is on main
+        env:
+          SOURCE_SHA: ${{ steps.attestation.outputs.source_sha }}
         run: git merge-base --is-ancestor "$SOURCE_SHA" origin/main
 
   production:
@@ -60,7 +95,7 @@ jobs:
           mkdir -p "$HOME/.kube"
           printf '%s' "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
-      - name: Promote the exact main image digest
+      - name: Promote the exact pre-release image digest
         env:
           IMAGE: ${{ needs.validate.outputs.image }}
         run: |
@@ -68,7 +103,9 @@ jobs:
             freelancing-api:api \
             freelancing-socket:socket \
             freelancing-worker:worker \
+            celery-beat:beat \
             celery-payments:worker \
+            celery-reconciliation:worker \
             celery-notifications:worker \
             celery-search:worker \
             celery-files:worker; do
@@ -80,4 +117,7 @@ jobs:
       - name: Production smoke
         env:
           PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
-        run: curl --fail --silent --show-error "$PRODUCTION_BASE_URL/health/ready"
+        run: |
+          curl --fail --silent --show-error "$PRODUCTION_BASE_URL/health/live"
+          curl --fail --silent --show-error "$PRODUCTION_BASE_URL/health/ready"
+          curl --fail --silent --show-error "$PRODUCTION_BASE_URL/health/startup"

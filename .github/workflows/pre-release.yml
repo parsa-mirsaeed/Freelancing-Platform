@@ -1,0 +1,358 @@
+name: Pre-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      main_run_id:
+        description: "successful Main workflow run id whose exact image is deployed to staging"
+        required: true
+        type: string
+      stripe_test_mode_validated:
+        description: "confirm the Stripe test-mode checklist in docs/stripe-payments.md completed with zero unexplained reconciliation mismatches"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: read
+  actions: read
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/parsa-mirsaeed/freelancing-platform
+
+concurrency:
+  group: pre-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      source_sha: ${{ steps.provenance.outputs.source_sha }}
+      image_digest: ${{ steps.provenance.outputs.image_digest }}
+      main_run_id: ${{ steps.provenance.outputs.main_run_id }}
+    steps:
+      - name: Require completed Stripe staging acceptance
+        env:
+          STRIPE_TEST_MODE_VALIDATED: ${{ inputs.stripe_test_mode_validated }}
+        run: test "$STRIPE_TEST_MODE_VALIDATED" = "true"
+      - name: Resolve successful main provenance
+        id: provenance
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          MAIN_RUN_ID: ${{ inputs.main_run_id }}
+        run: |
+          echo "$MAIN_RUN_ID" | grep -Eq '^[0-9]+$'
+          run_json="$(gh api "repos/$REPO/actions/runs/$MAIN_RUN_ID")"
+          test "$(jq -r '.name' <<<"$run_json")" = "Main"
+          test "$(jq -r '.event' <<<"$run_json")" = "push"
+          test "$(jq -r '.head_branch' <<<"$run_json")" = "main"
+          test "$(jq -r '.conclusion' <<<"$run_json")" = "success"
+          source_sha="$(jq -r '.head_sha' <<<"$run_json")"
+          echo "$source_sha" | grep -Eq '^[0-9a-f]{40}$'
+
+          mkdir -p /tmp/main
+          gh run download "$MAIN_RUN_ID" -R "$REPO" -n release-metadata -D /tmp/main
+          metadata=/tmp/main/release-metadata.json
+          test -s "$metadata"
+          test "$(jq -r '.source_sha' "$metadata")" = "$source_sha"
+          test "$(jq -r '.main_run_id' "$metadata")" = "$MAIN_RUN_ID"
+          image_digest="$(jq -r '.image_digest' "$metadata")"
+          echo "$image_digest" | grep -Eq '^sha256:[0-9a-f]{64}$'
+
+          sbom_name="sbom-$source_sha.spdx.json"
+          sbom_count="$(gh api "repos/$REPO/actions/runs/$MAIN_RUN_ID/artifacts" \
+            --jq "[.artifacts[] | select(.name == \"$sbom_name\")] | length")"
+          test "$sbom_count" -ge 1
+
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "image_digest=$image_digest" >> "$GITHUB_OUTPUT"
+          echo "main_run_id=$MAIN_RUN_ID" >> "$GITHUB_OUTPUT"
+
+  regression:
+    needs: validate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: freelancing
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d freelancing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: "false"
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports: ["9200:9200"]
+        options: >-
+          --health-cmd "curl -fs http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/freelancing
+      REDIS_URL: redis://localhost:6379/15
+      ELASTICSEARCH_URL: http://localhost:9200
+      ELASTICSEARCH_INDEX_PREFIX: freelancing-pre-release-${{ github.run_id }}
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: freelancing-pre-release-${{ github.run_id }}
+      SECRET_KEY: pre-release-only-secret
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Start MinIO
+        run: >-
+          docker run -d --rm --name minio-pre-release
+          -p 9000:9000
+          -e MINIO_ROOT_USER=minioadmin
+          -e MINIO_ROOT_PASSWORD=minioadmin
+          minio/minio:latest server /data
+      - name: Wait for MinIO
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fs http://localhost:9000/minio/health/live; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: ruff check app ci tests
+      - run: ruff format --check app ci tests
+      - run: mypy app ci
+      - run: alembic upgrade head
+      - run: alembic check
+      - run: pytest -m unit tests/unit
+      - run: pytest -m 'db or redis or search or socket or files' tests/integration
+
+  migration-cycle:
+    needs: validate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: freelancing
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d freelancing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/freelancing
+      SECRET_KEY: pre-release-only-secret
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]'
+      - run: alembic upgrade head
+      - run: alembic downgrade base
+      - run: alembic upgrade head
+      - run: alembic check
+
+  browser:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.11.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm install --global npm@11.17.0
+      - working-directory: frontend
+        run: npm ci
+      - working-directory: frontend
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Run complete cross-browser UI suite
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_FULL_MATRIX: "1"
+        run: npm run test:e2e
+
+  turn:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+      - name: Start pinned coturn
+        run: docker compose -f infra/docker/compose.turn.yml up -d turn
+      - name: Wait for TURN allocation service
+        run: |
+          for attempt in $(seq 1 30); do
+            if docker compose -f infra/docker/compose.turn.yml exec -T turn \
+              turnutils_uclient -W development-only-turn-secret -u pre-release -y -n 1 127.0.0.1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose -f infra/docker/compose.turn.yml logs turn
+          exit 1
+      - name: Exercise UDP and TCP TURN relay paths
+        run: |
+          docker compose -f infra/docker/compose.turn.yml exec -T turn \
+            turnutils_uclient -W development-only-turn-secret -u pre-release -y -n 5 127.0.0.1
+          docker compose -f infra/docker/compose.turn.yml exec -T turn \
+            turnutils_uclient -t -W development-only-turn-secret -u pre-release -y -n 5 127.0.0.1
+
+  security:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.11.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: python -m pip install --disable-pip-version-check -e '.[dev]' pip-audit bandit
+      - run: pip-audit
+      - run: bandit -q -r app
+      - run: python ci/validate_k8s.py
+      - working-directory: frontend
+        run: npm install --global npm@11.17.0
+      - working-directory: frontend
+        run: npm ci
+      - working-directory: frontend
+        run: npm audit --audit-level=high
+
+  external-staging:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+      EXPECTED_IMAGE: ${{ env.IMAGE_REPOSITORY }}@${{ needs.validate.outputs.image_digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.STAGING_KUBECONFIG_B64 }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          printf '%s' "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+      - name: Verify every staging workload runs the attested digest
+        run: |
+          for deployment in \
+            freelancing-api \
+            freelancing-socket \
+            freelancing-worker \
+            celery-beat \
+            celery-payments \
+            celery-reconciliation \
+            celery-notifications \
+            celery-search \
+            celery-files; do
+            actual="$(kubectl -n freelancing get "deployment/$deployment" \
+              -o jsonpath='{.spec.template.spec.containers[0].image}')"
+            test "$actual" = "$EXPECTED_IMAGE" || {
+              echo "$deployment runs $actual, expected $EXPECTED_IMAGE" >&2
+              exit 1
+            }
+          done
+      - name: Staging health smoke
+        run: |
+          curl --fail --silent --show-error "$STAGING_BASE_URL/health/live"
+          curl --fail --silent --show-error "$STAGING_BASE_URL/health/ready"
+          curl --fail --silent --show-error "$STAGING_BASE_URL/health/startup"
+      - name: Public API load and 30-minute concurrency soak
+        run: |
+          docker run --rm \
+            -e BASE_URL="$STAGING_BASE_URL" \
+            -e LOAD_DURATION=5m \
+            -e LOAD_VUS=20 \
+            -e SOAK_DURATION=30m \
+            -e SOAK_VUS=20 \
+            -v "$PWD:/work:ro" \
+            grafana/k6:latest run /work/ci/pre_release_load.js
+      - name: Complete staging DAST
+        run: |
+          docker run --rm \
+            -v "$PWD:/zap/wrk/:rw" \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-full-scan.py -t "$STAGING_BASE_URL" -r zap-pre-release.html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-pre-release-report
+          path: zap-pre-release.html
+          if-no-files-found: ignore
+          retention-days: 30
+
+  attest:
+    needs:
+      - validate
+      - regression
+      - migration-cycle
+      - browser
+      - turn
+      - security
+      - external-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write successful pre-release attestation
+        env:
+          SOURCE_SHA: ${{ needs.validate.outputs.source_sha }}
+          IMAGE_DIGEST: ${{ needs.validate.outputs.image_digest }}
+          MAIN_RUN_ID: ${{ needs.validate.outputs.main_run_id }}
+        run: |
+          jq -n \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg image_digest "$IMAGE_DIGEST" \
+            --arg main_run_id "$MAIN_RUN_ID" \
+            --arg pre_release_run_id "$GITHUB_RUN_ID" \
+            '{source_sha: $source_sha, image_digest: $image_digest, main_run_id: $main_run_id, pre_release_run_id: $pre_release_run_id}' \
+            > pre-release-attestation.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pre-release-attestation
+          path: pre-release-attestation.json
+          retention-days: 30
