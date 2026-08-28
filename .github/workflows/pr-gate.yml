@@ -66,6 +66,11 @@ jobs:
       - run: python ci/validate_openapi.py
       - run: python ci/validate_adrs.py
       - run: python ci/validate_k8s.py
+      - name: Lint GitHub Actions workflow syntax
+        if: needs.changes.outputs.ci == 'true'
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color -shellcheck= -pyflakes=
       - run: python -m compileall -q ci
 
   quality:
