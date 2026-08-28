@@ -3,12 +3,15 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 
 from app.config import Settings
+from app.extensions import db
 from app.feature_flags import is_feature_enabled
-from app.observability import JsonFormatter
+from app.observability import JsonFormatter, increment_counter, observe_histogram
+from app.payments.models import ProviderEvent, ReconciliationRun
 
 pytestmark = pytest.mark.unit
 
@@ -80,7 +83,61 @@ def test_metrics_endpoint_uses_low_cardinality_endpoint_labels(client) -> None: 
     text = response.get_data(as_text=True)
     assert 'endpoint="health.live"' in text
     assert "http_requests_total" in text
+    assert "http_server_errors_total" in text
     assert "http_request_duration_seconds_bucket" in text
+    assert "celery_queue_depth" in text
+    assert "db_pool_utilization_ratio" in text
+    assert "elasticsearch_operation_duration_seconds" in text
+    assert "payment_webhook_lag_seconds" in text
+    assert "turn_credentials_issued_total" in text
+    assert "webrtc_signaling_total" in text
+
+
+def test_metrics_render_bounded_runtime_samples(client) -> None:  # type: ignore[no-untyped-def]
+    increment_counter("webrtc_signaling_total", event="offer", outcome="failure")
+    observe_histogram(
+        "elasticsearch_operation_duration_seconds",
+        0.125,
+        operation="search",
+        outcome="success",
+    )
+    response = client.get("/internal/metrics")
+    text = response.get_data(as_text=True)
+    assert 'webrtc_signaling_total{event="offer",outcome="failure"}' in text
+    assert (
+        'elasticsearch_operation_duration_seconds_count{operation="search",outcome="success"}'
+        in text
+    )
+
+
+def test_financial_metrics_are_derived_from_deduplicated_database_state(client, app) -> None:  # type: ignore[no-untyped-def]
+    now = datetime.now(UTC)
+    with app.app_context():
+        db.session.add(
+            ProviderEvent(
+                provider="sandbox",
+                external_event_id="evt-observability-captured",
+                event_type="payment.captured",
+                payload_hash="0" * 64,
+                processed_at=now,
+            )
+        )
+        db.session.add(
+            ReconciliationRun(
+                provider="sandbox",
+                status="MISMATCH",
+                checked_count=3,
+                discrepancy_count=2,
+                details={"discrepancies": []},
+                completed_at=now,
+            )
+        )
+        db.session.commit()
+
+    text = client.get("/internal/metrics").get_data(as_text=True)
+    assert 'payment_events_total{outcome="captured",provider="sandbox"} 1' in text
+    assert 'payment_reconciliation_runs_total{provider="sandbox",status="mismatch"} 1' in text
+    assert 'payment_reconciliation_mismatches_total{provider="sandbox"} 2' in text
 
 
 def test_json_formatter_includes_request_and_trace_context(app) -> None:  # type: ignore[no-untyped-def]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Select, select
@@ -22,6 +23,7 @@ from app.messaging.models import (
     MessageReceipt,
 )
 from app.messaging.policies import is_conversation_member
+from app.observability import observe_histogram
 
 MAX_MESSAGE_BODY = 8000
 MAX_ATTACHMENTS = 10
@@ -297,6 +299,13 @@ def _mark_receipts(
                 )
             ).tuples()
         )
+
+    now = datetime.now(UTC)
+    delivery_latencies = [
+        max(0.0, (now - _as_utc(message.created_at)).total_seconds())
+        for message in messages
+        if "DELIVERED" in receipt_types and (message.id, "DELIVERED") not in existing
+    ]
     db.session.add_all(
         MessageReceipt(message_id=message.id, user_id=user.id, receipt_type=receipt_type)
         for message in messages
@@ -315,6 +324,8 @@ def _mark_receipts(
         )
     )
     db.session.commit()
+    for latency in delivery_latencies:
+        observe_histogram("message_delivery_duration_seconds", latency)
     return through_sequence
 
 
@@ -394,3 +405,9 @@ def _message_query() -> Select[tuple[Message]]:
         selectinload(Message.attachments),
         selectinload(Message.receipts),
     )
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

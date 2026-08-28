@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 
@@ -27,6 +28,7 @@ class VerifiedWebhook:
     external_event_id: str
     event_type: str
     data: dict[str, object]
+    occurred_at: datetime | None = None
 
 
 class PaymentProvider(Protocol):

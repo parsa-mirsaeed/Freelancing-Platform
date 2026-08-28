@@ -12,6 +12,7 @@ from typing import Any
 from flask import current_app
 
 from app.errors import ApiError
+from app.observability import increment_counter
 
 _DEFAULT_STUN_URLS = "stun:localhost:3478"
 _DEFAULT_TURN_URLS = "turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"
@@ -61,6 +62,7 @@ def issue_ice_servers(
                 "credential": credential,
             }
         )
+        increment_counter("turn_credentials_issued_total")
     return {
         "ice_servers": ice_servers,
         "expires_at": datetime.fromtimestamp(expires_unix, tz=UTC).isoformat(),

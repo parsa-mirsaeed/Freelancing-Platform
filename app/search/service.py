@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -9,6 +10,7 @@ from sqlalchemy import func, select
 from app.extensions import db, elasticsearch_extension
 from app.freelancers.models import FreelancerProfile
 from app.freelancers.service import normalize_skill_slug
+from app.observability import observe_histogram
 from app.portfolios.models import PortfolioItem
 from app.projects.models import Project
 from app.proposals.models import Proposal
@@ -19,50 +21,76 @@ ALIAS_SUFFIX = "freelancers"
 
 
 def ensure_freelancer_index(client: Elasticsearch | None = None) -> str:
-    client = client or elasticsearch_extension.get_client()
-    concrete = _concrete_index()
-    alias = _alias_name()
-    if not bool(client.indices.exists(index=concrete)):
-        client.indices.create(
-            index=concrete,
-            mappings={
-                "dynamic": "strict",
-                "properties": {
-                    "freelancer_id": {"type": "keyword"},
-                    "title": {"type": "text"},
-                    "bio": {"type": "text"},
-                    "skills": {"type": "keyword"},
-                    "rating": {"type": "float"},
-                    "completed_jobs": {"type": "integer"},
-                    "hourly_rate_minor": {"type": "long"},
-                    "currency": {"type": "keyword"},
-                    "availability": {"type": "boolean"},
-                    "languages": {"type": "keyword"},
-                    "portfolio_text": {"type": "text"},
-                    "projection_version": {"type": "long"},
-                    "updated_at": {"type": "date"},
+    started = time.perf_counter()
+    outcome = "success"
+    try:
+        client = client or elasticsearch_extension.get_client()
+        concrete = _concrete_index()
+        alias = _alias_name()
+        if not bool(client.indices.exists(index=concrete)):
+            client.indices.create(
+                index=concrete,
+                mappings={
+                    "dynamic": "strict",
+                    "properties": {
+                        "freelancer_id": {"type": "keyword"},
+                        "title": {"type": "text"},
+                        "bio": {"type": "text"},
+                        "skills": {"type": "keyword"},
+                        "rating": {"type": "float"},
+                        "completed_jobs": {"type": "integer"},
+                        "hourly_rate_minor": {"type": "long"},
+                        "currency": {"type": "keyword"},
+                        "availability": {"type": "boolean"},
+                        "languages": {"type": "keyword"},
+                        "portfolio_text": {"type": "text"},
+                        "projection_version": {"type": "long"},
+                        "updated_at": {"type": "date"},
+                    },
                 },
-            },
+            )
+        aliases = client.indices.get_alias(index=concrete)
+        alias_map = cast(dict[str, Any], aliases.body if hasattr(aliases, "body") else aliases)
+        if alias not in cast(dict[str, Any], alias_map.get(concrete, {})).get("aliases", {}):
+            client.indices.put_alias(index=concrete, name=alias)
+        return alias
+    except Exception:
+        outcome = "failure"
+        raise
+    finally:
+        observe_histogram(
+            "elasticsearch_operation_duration_seconds",
+            max(0.0, time.perf_counter() - started),
+            operation="ensure_index",
+            outcome=outcome,
         )
-    aliases = client.indices.get_alias(index=concrete)
-    alias_map = cast(dict[str, Any], aliases.body if hasattr(aliases, "body") else aliases)
-    if alias not in cast(dict[str, Any], alias_map.get(concrete, {})).get("aliases", {}):
-        client.indices.put_alias(index=concrete, name=alias)
-    return alias
 
 
 def index_freelancer(profile: FreelancerProfile, *, refresh: bool = False) -> None:
     client = elasticsearch_extension.get_client()
     alias = ensure_freelancer_index(client)
     document = build_freelancer_document(profile)
-    client.index(
-        index=alias,
-        id=str(profile.user_id),
-        document=document,
-        version=profile.projection_version,
-        version_type="external_gte",
-        refresh="wait_for" if refresh else False,
-    )
+    started = time.perf_counter()
+    outcome = "success"
+    try:
+        client.index(
+            index=alias,
+            id=str(profile.user_id),
+            document=document,
+            version=profile.projection_version,
+            version_type="external_gte",
+            refresh="wait_for" if refresh else False,
+        )
+    except Exception:
+        outcome = "failure"
+        raise
+    finally:
+        observe_histogram(
+            "elasticsearch_operation_duration_seconds",
+            max(0.0, time.perf_counter() - started),
+            operation="index",
+            outcome=outcome,
+        )
 
 
 def build_freelancer_document(profile: FreelancerProfile) -> dict[str, object]:
@@ -126,12 +154,25 @@ def search_freelancers(
                 }
             }
         )
-    response = client.search(
-        index=alias,
-        size=limit,
-        query={"bool": {"must": must or [{"match_all": {}}], "filter": filters}},
-        sort=[{"_score": "desc"}, {"rating": {"order": "desc", "missing": "_last"}}],
-    )
+    started = time.perf_counter()
+    outcome = "success"
+    try:
+        response = client.search(
+            index=alias,
+            size=limit,
+            query={"bool": {"must": must or [{"match_all": {}}], "filter": filters}},
+            sort=[{"_score": "desc"}, {"rating": {"order": "desc", "missing": "_last"}}],
+        )
+    except Exception:
+        outcome = "failure"
+        raise
+    finally:
+        observe_histogram(
+            "elasticsearch_operation_duration_seconds",
+            max(0.0, time.perf_counter() - started),
+            operation="search",
+            outcome=outcome,
+        )
     body = cast(dict[str, Any], response.body if hasattr(response, "body") else response)
     hits = cast(list[dict[str, Any]], body.get("hits", {}).get("hits", []))
     return [cast(dict[str, object], hit.get("_source", {})) for hit in hits]

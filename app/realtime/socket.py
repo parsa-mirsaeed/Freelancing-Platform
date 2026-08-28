@@ -25,6 +25,7 @@ from app.messaging.service import (
     send_message,
     serialize_message,
 )
+from app.observability import increment_counter
 from app.realtime.auth import authenticate_socket_token, load_socket_user
 from app.realtime.presence import bind_socket, heartbeat, is_online, socket_identity, unbind_socket
 from app.realtime.publisher import (
@@ -254,9 +255,11 @@ def webrtc_ice_candidate(data: dict[str, object]) -> dict[str, object]:
         candidate = validate_ice_candidate(data["candidate"])
         _call, peer_id = signal_peer(user=user, call_id=call_id)
     except (KeyError, TypeError, ValueError) as exc:
+        increment_counter("webrtc_signaling_total", event="ice_candidate", outcome="failure")
         return _socket_error("validation_error", str(exc))
     except ApiError as exc:
         db.session.rollback()
+        increment_counter("webrtc_signaling_total", event="ice_candidate", outcome="failure")
         return _api_error(exc)
     payload = {
         "call_id": str(call_id),
@@ -264,6 +267,7 @@ def webrtc_ice_candidate(data: dict[str, object]) -> dict[str, object]:
         "candidate": candidate,
     }
     publish_call_event("webrtc.ice_candidate", target_user_id=peer_id, payload=payload)
+    increment_counter("webrtc_signaling_total", event="ice_candidate", outcome="success")
     return {"ok": True}
 
 
@@ -306,9 +310,11 @@ def _relay_description(
         )
         _call, peer_id = signal_peer(user=user, call_id=call_id)
     except (KeyError, TypeError, ValueError) as exc:
+        increment_counter("webrtc_signaling_total", event=expected_type, outcome="failure")
         return _socket_error("validation_error", str(exc))
     except ApiError as exc:
         db.session.rollback()
+        increment_counter("webrtc_signaling_total", event=expected_type, outcome="failure")
         return _api_error(exc)
     payload = {
         "call_id": str(call_id),
@@ -316,6 +322,7 @@ def _relay_description(
         "description": description,
     }
     publish_call_event(event, target_user_id=peer_id, payload=payload)
+    increment_counter("webrtc_signaling_total", event=expected_type, outcome="success")
     return {"ok": True}
 
 
