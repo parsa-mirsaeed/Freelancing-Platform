@@ -19,7 +19,9 @@ REQUIRED_DEPLOYMENTS = {
     "freelancing-api",
     "freelancing-socket",
     "freelancing-worker",
+    "celery-beat",
     "celery-payments",
+    "celery-reconciliation",
     "celery-notifications",
     "celery-search",
     "celery-files",
@@ -27,6 +29,7 @@ REQUIRED_DEPLOYMENTS = {
 EXPECTED_QUEUES = {
     "freelancing-worker": "default",
     "celery-payments": "payments",
+    "celery-reconciliation": "reconciliation",
     "celery-notifications": "notifications",
     "celery-search": "search_index",
     "celery-files": "files",
@@ -95,13 +98,16 @@ def _validate_deployment(document: dict[str, Any]) -> str:
         container = containers[0]
         for probe in ("livenessProbe", "readinessProbe", "startupProbe"):
             _require(probe in container, f"{name}: {probe} required")
+    command = [str(item) for item in containers[0].get("command", [])]
     expected_queue = EXPECTED_QUEUES.get(name)
     if expected_queue is not None:
-        command = [str(item) for item in containers[0].get("command", [])]
         _require(
             f"--queues={expected_queue}" in command,
             f"{name}: must consume only {expected_queue!r}",
         )
+    if name == "celery-beat":
+        _require("beat" in command, "celery-beat: must run the Celery beat scheduler")
+        _require("worker" not in command, "celery-beat: must not consume worker queues")
     return name
 
 
