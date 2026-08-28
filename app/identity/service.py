@@ -117,33 +117,57 @@ def login_user(
         raise _invalid_credentials()
 
     if user.locked_until is not None and _normalized_datetime(user.locked_until) > now:
-        _record_login_risk(user, context, reason="temporary_lock")
+        state = _login_security_state(user)
+        _record_login_risk(
+            user,
+            context,
+            reason="temporary_lock",
+            previous_state=state,
+            new_state=state,
+        )
         db.session.commit()
         raise _invalid_credentials()
 
     if not password_ok:
+        previous_state = _login_security_state(user)
         user.failed_login_attempts += 1
         locked = user.failed_login_attempts >= auth_max_failed_attempts()
         if locked:
             user.locked_until = now + timedelta(seconds=auth_lock_seconds())
             user.failed_login_attempts = 0
-        _record_login_risk(user, context, reason="temporary_lock" if locked else "invalid_password")
+        _record_login_risk(
+            user,
+            context,
+            reason="temporary_lock" if locked else "invalid_password",
+            previous_state=previous_state,
+            new_state=_login_security_state(user),
+        )
         db.session.commit()
         raise _invalid_credentials()
 
+    previous_login_state = _login_security_state(user)
     user.failed_login_attempts = 0
     user.locked_until = None
     pii_key_rotated = user.rotate_email_encryption_if_needed()
     access, refresh, new_device = _create_session(user, context)
+    current_login_state = _login_security_state(user)
     record_audit_event(
         action="identity.login_succeeded",
         resource_type="user",
         resource_id=str(user.id),
         actor_user_id=user.id,
+        previous_state=previous_login_state,
+        new_state=current_login_state,
         metadata={"new_device": new_device, "pii_key_rotated": pii_key_rotated},
     )
     if new_device:
-        _record_login_risk(user, context, reason="new_device")
+        _record_login_risk(
+            user,
+            context,
+            reason="new_device",
+            previous_state=current_login_state,
+            new_state=current_login_state,
+        )
     db.session.commit()
     return user, access, refresh
 
@@ -207,12 +231,15 @@ def start_totp_enrollment(*, user: User, password: str) -> dict[str, str]:
     if user.mfa_enabled_at is not None:
         raise ApiError("mfa_already_enabled", "MFA already enabled", 409, "MFA is already enabled")
     if not user.mfa_seed:
+        previous_state = _mfa_security_state(user)
         user.mfa_seed = new_mfa_seed()
         record_audit_event(
             action="identity.mfa_enrollment_started",
             resource_type="user",
             resource_id=str(user.id),
             actor_user_id=user.id,
+            previous_state=previous_state,
+            new_state=_mfa_security_state(user),
         )
         db.session.commit()
     return {"secret": totp_secret(user), "otpauth_uri": provisioning_uri(user)}
@@ -231,6 +258,7 @@ def confirm_totp_enrollment(*, user: User, session: UserSession, code: str) -> d
     if not verify_totp(user, code):
         raise ApiError("invalid_mfa_code", "Invalid MFA code", 422, "The MFA code is invalid")
 
+    previous_state = _mfa_security_state(user)
     now = datetime.now(UTC)
     user.mfa_enabled_at = now
     session.mfa_verified_at = now
@@ -254,6 +282,8 @@ def confirm_totp_enrollment(*, user: User, session: UserSession, code: str) -> d
         resource_type="user",
         resource_id=str(user.id),
         actor_user_id=user.id,
+        previous_state=previous_state,
+        new_state=_mfa_security_state(user),
     )
     db.session.commit()
     return {
@@ -271,6 +301,7 @@ def verify_mfa_challenge(*, user: User, session: UserSession, code: str) -> dict
             "Enroll MFA before attempting a challenge",
         )
 
+    previous_session_state = _session_mfa_state(session)
     now = datetime.now(UTC)
     recovery_used = False
     if not verify_totp(user, code, now=now):
@@ -286,11 +317,14 @@ def verify_mfa_challenge(*, user: User, session: UserSession, code: str) -> dict
             .with_for_update()
         )
         if recovery is None:
+            state = _session_mfa_state(session)
             record_audit_event(
                 action="identity.mfa_challenge_failed",
                 resource_type="session",
                 resource_id=str(session.id),
                 actor_user_id=user.id,
+                previous_state=state,
+                new_state=state,
             )
             db.session.commit()
             raise ApiError("invalid_mfa_code", "Invalid MFA code", 401, "The MFA code is invalid")
@@ -303,6 +337,8 @@ def verify_mfa_challenge(*, user: User, session: UserSession, code: str) -> dict
         resource_type="session",
         resource_id=str(session.id),
         actor_user_id=user.id,
+        previous_state=previous_session_state,
+        new_state=_session_mfa_state(session),
         metadata={"recovery_code": recovery_used},
     )
     if recovery_used:
@@ -311,6 +347,8 @@ def verify_mfa_challenge(*, user: User, session: UserSession, code: str) -> dict
             resource_type="user",
             resource_id=str(user.id),
             actor_user_id=user.id,
+            previous_state={"recovery_code_consumed": False},
+            new_state={"recovery_code_consumed": True},
         )
     db.session.commit()
     return {
@@ -383,18 +421,45 @@ def _create_session(user: User, context: ClientContext | None) -> tuple[str, str
     return access, refresh, new_device
 
 
-def _record_login_risk(user: User, context: ClientContext | None, *, reason: str) -> None:
+def _record_login_risk(
+    user: User,
+    context: ClientContext | None,
+    *,
+    reason: str,
+    previous_state: dict[str, object],
+    new_state: dict[str, object],
+) -> None:
     record_audit_event(
         action="identity.login_risk",
         resource_type="user",
         resource_id=str(user.id),
         actor_user_id=user.id,
+        previous_state=previous_state,
+        new_state=new_state,
         metadata={
             "reason": reason,
             "ip_hash": context.ip_hash if context else None,
             "device_fingerprint_hash": context.fingerprint_hash if context else None,
         },
     )
+
+
+def _login_security_state(user: User) -> dict[str, object]:
+    return {
+        "failed_login_attempts": user.failed_login_attempts,
+        "locked_until": _iso_or_none(user.locked_until),
+    }
+
+
+def _mfa_security_state(user: User) -> dict[str, object]:
+    return {
+        "enabled": user.mfa_enabled_at is not None,
+        "enrollment_pending": bool(user.mfa_seed) and user.mfa_enabled_at is None,
+    }
+
+
+def _session_mfa_state(session: UserSession) -> dict[str, object]:
+    return {"mfa_verified_at": _iso_or_none(session.mfa_verified_at)}
 
 
 def _invalid_credentials() -> ApiError:

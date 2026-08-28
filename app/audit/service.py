@@ -14,6 +14,34 @@ from flask import g, has_request_context
 from app.audit.models import AuditEvent
 from app.extensions import db
 
+_STATE_HASH_REQUIRED_ACTIONS = frozenset(
+    {
+        "contract.created",
+        "contract.signed",
+        "contract.activated",
+        "contract.cancelled",
+        "identity.login_risk",
+        "identity.login_succeeded",
+        "identity.mfa_enrollment_started",
+        "identity.mfa_enabled",
+        "identity.mfa_challenge_failed",
+        "identity.mfa_verified",
+        "identity.mfa_recovery_code_used",
+        "payout_provider_account.configured",
+        "payout_provider_account.disabled",
+        "payout.reserved",
+        "payout.succeeded",
+        "payout.failed",
+        "milestone.released",
+        "refund.reserved",
+        "milestone.refunded",
+        "refund.failed",
+        "dispute.opened",
+        "dispute.transitioned",
+        "dispute.resolved",
+    }
+)
+
 
 def audit_state_hash(state: Mapping[str, object] | None) -> str | None:
     if state is None:
@@ -43,6 +71,8 @@ def record_audit_event(
         previous_state = _metadata_state(metadata_json, "before")
     if new_state is None:
         new_state = _metadata_state(metadata_json, "after")
+    if action in _STATE_HASH_REQUIRED_ACTIONS and (previous_state is None or new_state is None):
+        raise ValueError(f"High-risk audit action {action} requires previous and new state")
     event = AuditEvent(
         actor_user_id=actor_user_id,
         action=action,

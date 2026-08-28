@@ -57,6 +57,7 @@ def configure_payout_provider_account(
         )
         .with_for_update()
     )
+    previous_state = _provider_account_state(account, provider_name=provider.name)
     if account is None:
         account = PayoutProviderAccount(
             freelancer_user_id=freelancer_user_id,
@@ -75,6 +76,8 @@ def configure_payout_provider_account(
         resource_type="payout_provider_account",
         resource_id=str(account.id),
         actor_user_id=administrator.id,
+        previous_state=previous_state,
+        new_state=_provider_account_state(account),
         metadata={
             "freelancer_user_id": str(freelancer_user_id),
             "provider": provider.name,
@@ -104,12 +107,15 @@ def disable_payout_provider_account(
             404,
             "Payout provider account was not found",
         )
+    previous_state = _provider_account_state(account)
     account.status = "DISABLED"
     record_audit_event(
         action="payout_provider_account.disabled",
         resource_type="payout_provider_account",
         resource_id=str(account.id),
         actor_user_id=administrator.id,
+        previous_state=previous_state,
+        new_state=_provider_account_state(account),
         metadata={
             "freelancer_user_id": str(freelancer_user_id),
             "provider": account.provider,
@@ -138,6 +144,26 @@ def resolve_payout_destination(*, freelancer_user_id: uuid.UUID, provider_name: 
             "Configure and verify a payout provider account before requesting this payout",
         )
     return account.external_account_reference
+
+
+def _provider_account_state(
+    account: PayoutProviderAccount | None,
+    *,
+    provider_name: str | None = None,
+) -> dict[str, object]:
+    if account is None:
+        return {
+            "exists": False,
+            "provider": provider_name,
+            "status": None,
+            "external_account_reference": None,
+        }
+    return {
+        "exists": True,
+        "provider": account.provider,
+        "status": account.status,
+        "external_account_reference": account.external_account_reference,
+    }
 
 
 def _serialize(account: PayoutProviderAccount) -> dict[str, object]:

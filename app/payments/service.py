@@ -234,6 +234,7 @@ def release_milestone(
             "Milestone must be approved before escrow is released",
         )
 
+    previous_state = _milestone_audit_state(milestone)
     escrow = _require_escrow(milestone.id)
     escrow_account = db.session.scalar(
         select(LedgerAccount).where(LedgerAccount.id == escrow.escrow_account_id).with_for_update()
@@ -308,6 +309,8 @@ def release_milestone(
         resource_type="milestone",
         resource_id=str(milestone.id),
         actor_user_id=user.id,
+        previous_state=previous_state,
+        new_state=_milestone_audit_state(milestone),
         metadata={
             "journal_transaction_id": str(journal.id),
             "amount_minor": milestone.amount_minor,
@@ -410,6 +413,12 @@ def refund_milestone(
             resource_type="refund",
             resource_id=str(refund.id),
             actor_user_id=user.id,
+            previous_state={"exists": False},
+            new_state={
+                "exists": True,
+                "refund": _refund_audit_state(refund),
+                "milestone": _milestone_audit_state(milestone),
+            },
             metadata={
                 "milestone_id": str(milestone.id),
                 "amount_minor": refund.amount_minor,
@@ -454,6 +463,10 @@ def refund_milestone(
         return terminal
     if result.amount_minor != refund.amount_minor or result.currency != refund.currency:
         return _fail_refund(refund.id, actor_user_id=user.id)
+    previous_state = {
+        "refund": _refund_audit_state(refund),
+        "milestone": _milestone_audit_state(milestone),
+    }
     refund.provider_reference = result.reference
     if result.status == "PENDING":
         db.session.commit()
@@ -484,6 +497,11 @@ def refund_milestone(
         resource_type="refund",
         resource_id=str(refund.id),
         actor_user_id=user.id,
+        previous_state=previous_state,
+        new_state={
+            "refund": _refund_audit_state(refund),
+            "milestone": _milestone_audit_state(milestone),
+        },
         metadata={
             "milestone_id": str(milestone.id),
             "amount_minor": refund.amount_minor,
@@ -759,6 +777,7 @@ def _fail_refund(
         if terminal is None:
             raise RuntimeError("Refund has an unsupported terminal state")
         return terminal
+    previous_state = _refund_audit_state(refund)
     journal = db.session.get(JournalTransaction, refund.journal_transaction_id)
     escrow = _require_escrow(refund.milestone_id)
     escrow_account = db.session.get(LedgerAccount, escrow.escrow_account_id)
@@ -786,6 +805,8 @@ def _fail_refund(
         resource_type="refund",
         resource_id=str(refund.id),
         actor_user_id=actor_user_id,
+        previous_state=previous_state,
+        new_state=_refund_audit_state(refund),
     )
     persisted_idem = db.session.get(FinancialIdempotencyKey, refund.idempotency_key_id)
     if persisted_idem is None:
@@ -803,6 +824,24 @@ def _failed_refund_body(refund: Refund) -> dict[str, object]:
         "status": 502,
         "detail": "The payment provider did not complete the refund; escrow funds were restored",
         "refund_id": str(refund.id),
+    }
+
+
+def _milestone_audit_state(milestone: Milestone) -> dict[str, object]:
+    return {
+        "status": milestone.status,
+        "amount_minor": milestone.amount_minor,
+        "currency": milestone.currency,
+    }
+
+
+def _refund_audit_state(refund: Refund) -> dict[str, object]:
+    return {
+        "status": refund.status,
+        "amount_minor": refund.amount_minor,
+        "currency": refund.currency,
+        "provider": refund.provider,
+        "provider_reference_set": refund.provider_reference is not None,
     }
 
 

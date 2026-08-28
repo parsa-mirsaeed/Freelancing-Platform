@@ -112,6 +112,8 @@ def create_payout(
             resource_type="payout",
             resource_id=str(payout.id),
             actor_user_id=user.id,
+            previous_state={"exists": False},
+            new_state=_payout_state(payout),
             metadata={
                 "amount_minor": amount_minor,
                 "currency": currency,
@@ -155,6 +157,7 @@ def create_payout(
     if result.amount_minor != payout.amount_minor or result.currency != payout.currency:
         return _fail_payout(payout.id, actor_user_id=user.id)
 
+    previous_state = _payout_state(payout)
     payout.provider_reference = result.reference
     payout.status = "SUCCEEDED"
     payout.completed_at = datetime.now(UTC)
@@ -169,6 +172,8 @@ def create_payout(
         resource_type="payout",
         resource_id=str(payout.id),
         actor_user_id=user.id,
+        previous_state=previous_state,
+        new_state=_payout_state(payout),
         metadata={
             "amount_minor": payout.amount_minor,
             "currency": payout.currency,
@@ -224,6 +229,7 @@ def _fail_payout(
             raise RuntimeError("Payout has an unsupported terminal state")
         return terminal
 
+    previous_state = _payout_state(payout)
     wallet = db.session.scalar(
         select(LedgerAccount).where(
             LedgerAccount.account_key
@@ -257,6 +263,8 @@ def _fail_payout(
         resource_type="payout",
         resource_id=str(payout.id),
         actor_user_id=actor_user_id,
+        previous_state=previous_state,
+        new_state=_payout_state(payout),
     )
     persisted_idem = db.session.get(FinancialIdempotencyKey, payout.idempotency_key_id)
     if persisted_idem is None:
@@ -265,6 +273,18 @@ def _fail_payout(
     complete_idempotency(persisted_idem, status=502, body=body)
     db.session.commit()
     return body, 502
+
+
+def _payout_state(payout: Payout) -> dict[str, object]:
+    return {
+        "status": payout.status,
+        "amount_minor": payout.amount_minor,
+        "currency": payout.currency,
+        "provider": payout.provider,
+        "provider_reference_set": payout.provider_reference is not None,
+        "destination_snapshot_set": payout.provider_destination_reference is not None,
+        "reversal_recorded": payout.reversal_journal_transaction_id is not None,
+    }
 
 
 def _pending_payout_body(payout: Payout) -> dict[str, object]:
