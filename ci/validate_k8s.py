@@ -108,6 +108,14 @@ def _validate_deployment(document: dict[str, Any]) -> str:
     if name == "celery-beat":
         _require("beat" in command, "celery-beat: must run the Celery beat scheduler")
         _require("worker" not in command, "celery-beat: must not consume worker queues")
+        _require(
+            "--schedule=/tmp/celerybeat-schedule" in command,
+            "celery-beat: schedule database must use the writable /tmp mount",
+        )
+        _require(
+            "--pidfile=/tmp/celerybeat.pid" in command,
+            "celery-beat: pid file must use the writable /tmp mount",
+        )
     return name
 
 
