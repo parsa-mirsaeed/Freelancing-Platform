@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
 from typing import Any
 
 from stripe import (
@@ -238,6 +239,7 @@ class StripePaymentProvider:
         stripe_event_type = str(self._value(event, "type", ""))
         data = self._value(event, "data")
         session = self._value(data, "object")
+        occurred_at = self._event_occurred_at(event)
         if not event_id or not stripe_event_type:
             raise ApiError(
                 "invalid_webhook_payload",
@@ -258,11 +260,13 @@ class StripePaymentProvider:
                     external_event_id=event_id,
                     event_type="payment.ignored",
                     data={"stripe_event_type": stripe_event_type},
+                    occurred_at=occurred_at,
                 )
             return VerifiedWebhook(
                 external_event_id=event_id,
                 event_type="payment.captured",
                 data=self._checkout_event_data(session),
+                occurred_at=occurred_at,
             )
         if stripe_event_type in {
             "checkout.session.async_payment_failed",
@@ -272,12 +276,24 @@ class StripePaymentProvider:
                 external_event_id=event_id,
                 event_type="payment.failed",
                 data={"provider_reference": self._required_string(session, "id")},
+                occurred_at=occurred_at,
             )
         return VerifiedWebhook(
             external_event_id=event_id,
             event_type="payment.ignored",
             data={"stripe_event_type": stripe_event_type},
+            occurred_at=occurred_at,
         )
+
+    @classmethod
+    def _event_occurred_at(cls, event: Any) -> datetime | None:
+        created = cls._value(event, "created")
+        if isinstance(created, bool) or not isinstance(created, (int, float)):
+            return None
+        try:
+            return datetime.fromtimestamp(float(created), tz=UTC)
+        except (OSError, OverflowError, ValueError):
+            return None
 
     def _retrieve_checkout(self, reference: str, *, operation: str) -> Any:
         return self._provider_call(
