@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   packages: write
+  actions: write
 
 env:
   IMAGE_REPOSITORY: ghcr.io/parsa-mirsaeed/freelancing-platform
@@ -123,6 +124,21 @@ jobs:
         with:
           image: ${{ env.IMAGE_REPOSITORY }}@${{ steps.build.outputs.digest }}
           artifact-name: sbom-${{ github.sha }}.spdx.json
+      - name: Record immutable release provenance
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          jq -n \
+            --arg source_sha "$GITHUB_SHA" \
+            --arg image_digest "$IMAGE_DIGEST" \
+            --arg main_run_id "$GITHUB_RUN_ID" \
+            '{source_sha: $source_sha, image_digest: $image_digest, main_run_id: $main_run_id}' \
+            > release-metadata.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-metadata
+          path: release-metadata.json
+          retention-days: 30
 
   staging:
     needs: image
@@ -146,7 +162,9 @@ jobs:
             freelancing-api:api \
             freelancing-socket:socket \
             freelancing-worker:worker \
+            celery-beat:beat \
             celery-payments:worker \
+            celery-reconciliation:worker \
             celery-notifications:worker \
             celery-search:worker \
             celery-files:worker; do
@@ -158,4 +176,7 @@ jobs:
       - name: Staging smoke
         env:
           STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
-        run: curl --fail --silent --show-error "$STAGING_BASE_URL/health/ready"
+        run: |
+          curl --fail --silent --show-error "$STAGING_BASE_URL/health/live"
+          curl --fail --silent --show-error "$STAGING_BASE_URL/health/ready"
+          curl --fail --silent --show-error "$STAGING_BASE_URL/health/startup"
