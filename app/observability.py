@@ -327,7 +327,7 @@ def _before_cursor_execute(
     context: Any,
     _executemany: bool,
 ) -> None:
-    setattr(context, "_freelancing_query_started_at", time.perf_counter())
+    context._freelancing_query_started_at = time.perf_counter()
 
 
 def _after_cursor_execute(
@@ -454,17 +454,21 @@ def _dynamic_counters() -> dict[str, Counter[tuple[tuple[str, str], ...]]]:
                 if event_type == "payment.failed"
                 else "ignored"
             )
-            payment_samples[(('provider', str(provider)), ('outcome', outcome))] += int(count)
+            payment_samples[(("provider", str(provider)), ("outcome", outcome))] += int(count)
         result["payment_events_total"] = payment_samples
 
         run_samples: Counter[tuple[tuple[str, str], ...]] = Counter()
         rows = db.session.execute(
-            select(ReconciliationRun.provider, ReconciliationRun.status, func.count(ReconciliationRun.id))
+            select(
+                ReconciliationRun.provider,
+                ReconciliationRun.status,
+                func.count(ReconciliationRun.id),
+            )
             .where(ReconciliationRun.status != "RUNNING")
             .group_by(ReconciliationRun.provider, ReconciliationRun.status)
         )
         for provider, status, count in rows:
-            run_samples[(('provider', str(provider)), ('status', str(status).lower()))] = int(count)
+            run_samples[(("provider", str(provider)), ("status", str(status).lower()))] = int(count)
         result["payment_reconciliation_runs_total"] = run_samples
 
         mismatch_samples: Counter[tuple[tuple[str, str], ...]] = Counter()
@@ -474,7 +478,7 @@ def _dynamic_counters() -> dict[str, Counter[tuple[tuple[str, str], ...]]]:
             .group_by(ReconciliationRun.provider)
         )
         for provider, count in rows:
-            mismatch_samples[(('provider', str(provider)),)] = int(count or 0)
+            mismatch_samples[(("provider", str(provider)),)] = int(count or 0)
         result["payment_reconciliation_mismatches_total"] = mismatch_samples
     except SQLAlchemyError:
         db.session.rollback()
