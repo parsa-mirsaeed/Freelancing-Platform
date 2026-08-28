@@ -8,7 +8,7 @@ import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from weakref import WeakSet
 
 from flask import (
@@ -366,8 +366,8 @@ def metrics() -> Response:
     ]
     with _lock:
         for (method, endpoint, status), count in sorted(_request_totals.items()):
-            labels = _labels(method=method, endpoint=endpoint, status=str(status))
-            lines.append(f"http_requests_total{{{labels}}} {count}")
+            http_labels = _labels(method=method, endpoint=endpoint, status=str(status))
+            lines.append(f"http_requests_total{{{http_labels}}} {count}")
         lines.extend(
             [
                 "# HELP http_server_errors_total HTTP 5xx responses completed.",
@@ -375,8 +375,8 @@ def metrics() -> Response:
             ]
         )
         for (method, endpoint), count in sorted(_server_error_totals.items()):
-            labels = _labels(method=method, endpoint=endpoint)
-            lines.append(f"http_server_errors_total{{{labels}}} {count}")
+            http_labels = _labels(method=method, endpoint=endpoint)
+            lines.append(f"http_server_errors_total{{{http_labels}}} {count}")
         lines.extend(
             [
                 "# HELP http_request_duration_seconds HTTP request duration.",
@@ -385,8 +385,8 @@ def metrics() -> Response:
         )
         for (method, endpoint), counts in sorted(_duration_counts.items()):
             for index, boundary in enumerate(_HTTP_BUCKETS):
-                labels = _labels(method=method, endpoint=endpoint, le=str(boundary))
-                lines.append(f"http_request_duration_seconds_bucket{{{labels}}} {counts[index]}")
+                http_labels = _labels(method=method, endpoint=endpoint, le=str(boundary))
+                lines.append(f"http_request_duration_seconds_bucket{{{http_labels}}} {counts[index]}")
             inf_labels = _labels(method=method, endpoint=endpoint, le="+Inf")
             lines.append(f"http_request_duration_seconds_bucket{{{inf_labels}}} {counts[-1]}")
             count_labels = _labels(method=method, endpoint=endpoint)
@@ -406,29 +406,41 @@ def metrics() -> Response:
         local_histogram_sums = dict(_histogram_sums)
 
     for source in (shared_counters, dynamic_counters):
-        for name, values in source.items():
-            local_counters.setdefault(name, Counter()).update(values)
-    for name, values in dynamic_gauges.items():
-        local_gauges.setdefault(name, {}).update(values)
+        for metric_name, counter_samples in source.items():
+            local_counters.setdefault(metric_name, Counter()).update(counter_samples)
+    for metric_name, gauge_samples in dynamic_gauges.items():
+        local_gauges.setdefault(metric_name, {}).update(gauge_samples)
 
-    for name, spec in _METRICS.items():
-        lines.extend([f"# HELP {name} {spec.help}", f"# TYPE {name} {spec.kind}"])
+    for metric_name, spec in _METRICS.items():
+        lines.extend([f"# HELP {metric_name} {spec.help}", f"# TYPE {metric_name} {spec.kind}"])
         if spec.kind == "counter":
-            for labels, value in sorted(local_counters.get(name, {}).items()):
-                lines.append(_sample(name, labels, value))
+            for sample_labels, counter_value in sorted(local_counters.get(metric_name, {}).items()):
+                lines.append(_sample(metric_name, sample_labels, counter_value))
         elif spec.kind == "gauge":
-            for labels, value in sorted(local_gauges.get(name, {}).items()):
-                lines.append(_sample(name, labels, value))
+            for sample_labels, gauge_value in sorted(local_gauges.get(metric_name, {}).items()):
+                lines.append(_sample(metric_name, sample_labels, gauge_value))
         else:
-            for (metric_name, labels), counts in sorted(local_histograms.items()):
-                if metric_name != name:
+            for (histogram_name, sample_labels), counts in sorted(local_histograms.items()):
+                if histogram_name != metric_name:
                     continue
                 for index, boundary in enumerate(spec.buckets):
-                    bucket_labels = (*labels, ("le", str(boundary)))
-                    lines.append(_sample(f"{name}_bucket", bucket_labels, counts[index]))
-                lines.append(_sample(f"{name}_bucket", (*labels, ("le", "+Inf")), counts[-1]))
-                lines.append(_sample(f"{name}_count", labels, counts[-1]))
-                lines.append(_sample(f"{name}_sum", labels, local_histogram_sums[(name, labels)]))
+                    bucket_labels = (*sample_labels, ("le", str(boundary)))
+                    lines.append(_sample(f"{metric_name}_bucket", bucket_labels, counts[index]))
+                lines.append(
+                    _sample(
+                        f"{metric_name}_bucket",
+                        (*sample_labels, ("le", "+Inf")),
+                        counts[-1],
+                    )
+                )
+                lines.append(_sample(f"{metric_name}_count", sample_labels, counts[-1]))
+                lines.append(
+                    _sample(
+                        f"{metric_name}_sum",
+                        sample_labels,
+                        local_histogram_sums[(metric_name, sample_labels)],
+                    )
+                )
 
     return Response("\n".join(lines) + "\n", mimetype="text/plain")
 
@@ -510,7 +522,8 @@ def _dynamic_gauges() -> dict[str, dict[tuple[tuple[str, str], ...], float]]:
         client = redis_extension.get_client(current_app)
         for queue in _CELERY_QUEUES:
             key = (("queue", queue),)
-            result["celery_queue_depth"][key] = float(client.llen(queue))
+            queue_depth = cast(int, client.llen(queue))
+            result["celery_queue_depth"][key] = float(queue_depth)
         result["socket_active_connections"][()] = float(
             sum(1 for _ in client.scan_iter(match="socket-principal:*", count=500))
         )
@@ -542,7 +555,8 @@ def _read_shared_counters() -> dict[str, Counter[tuple[tuple[str, str], ...]]]:
         client = redis_extension.get_client(current_app)
         for name in sorted(_SHARED_COUNTERS):
             samples: Counter[tuple[tuple[str, str], ...]] = Counter()
-            for raw_labels, raw_value in client.hgetall(_shared_counter_key(name)).items():
+            raw_samples = cast(dict[Any, Any], client.hgetall(_shared_counter_key(name)))
+            for raw_labels, raw_value in raw_samples.items():
                 labels = _decode_labels(str(raw_labels))
                 if labels is None:
                     continue
