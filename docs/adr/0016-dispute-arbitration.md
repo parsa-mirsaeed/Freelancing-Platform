@@ -1,4 +1,4 @@
-# ADR-0013: Dispute arbitration consumes escrow atomically
+# ADR-0016: Dispute arbitration consumes escrow atomically
 
 ## Status
 
