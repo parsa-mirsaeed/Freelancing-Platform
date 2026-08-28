@@ -386,7 +386,9 @@ def metrics() -> Response:
         for (method, endpoint), counts in sorted(_duration_counts.items()):
             for index, boundary in enumerate(_HTTP_BUCKETS):
                 http_labels = _labels(method=method, endpoint=endpoint, le=str(boundary))
-                lines.append(f"http_request_duration_seconds_bucket{{{http_labels}}} {counts[index]}")
+                lines.append(
+                    f"http_request_duration_seconds_bucket{{{http_labels}}} {counts[index]}"
+                )
             inf_labels = _labels(method=method, endpoint=endpoint, le="+Inf")
             lines.append(f"http_request_duration_seconds_bucket{{{inf_labels}}} {counts[-1]}")
             count_labels = _labels(method=method, endpoint=endpoint)
