@@ -7,7 +7,6 @@ on:
 permissions:
   contents: read
   packages: write
-  actions: write
 
 env:
   IMAGE_REPOSITORY: ghcr.io/parsa-mirsaeed/freelancing-platform
