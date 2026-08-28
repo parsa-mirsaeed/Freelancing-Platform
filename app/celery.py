@@ -3,14 +3,25 @@ from __future__ import annotations
 from typing import Any
 
 from celery import Celery, Task
+from celery.exceptions import Retry
 from flask import Flask
+
+from app.observability import increment_shared_counter
 
 
 def create_celery_app(app: Flask) -> Celery:
     class FlaskTask(Task):  # type: ignore[misc]
         def __call__(self, *args: object, **kwargs: object) -> Any:
+            task_name = str(self.name or "unknown")
             with app.app_context():
-                return self.run(*args, **kwargs)
+                try:
+                    return self.run(*args, **kwargs)
+                except Retry:
+                    increment_shared_counter("celery_task_retries_total", task=task_name)
+                    raise
+                except Exception:
+                    increment_shared_counter("celery_task_failures_total", task=task_name)
+                    raise
 
     celery_app = Celery(app.import_name, task_cls=FlaskTask)
     celery_app.config_from_object(
