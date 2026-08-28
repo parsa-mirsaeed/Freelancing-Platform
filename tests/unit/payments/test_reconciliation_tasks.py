@@ -47,7 +47,9 @@ def test_periodic_reconciliation_is_inert_when_payment_runtime_is_disabled() -> 
     }
 
 
-def test_periodic_reconciliation_uses_backend_default_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_periodic_reconciliation_uses_backend_default_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     app = _app(enabled=True)
     run = SimpleNamespace(
         id="run-1",
