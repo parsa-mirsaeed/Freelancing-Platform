@@ -31,7 +31,7 @@ List only tests required by the affected domains and critical invariants. Do not
 
 ## Definition of Done
 
-Use [docs/definition-of-done.md](../docs/definition-of-done.md). Check each applicable requirement; when a requirement is not applicable, state why below instead of silently skipping it.
+Use `docs/definition-of-done.md`. Check each applicable requirement; when a requirement is not applicable, state why below instead of silently skipping it.
 
 - [ ] Business state machine is explicit for changed workflow behavior, or N/A is justified.
 - [ ] Authorization policy is explicit and tested where access changes.
