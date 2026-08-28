@@ -146,6 +146,8 @@ spec:
             - app.celery_worker.celery_app
             - beat
             - --loglevel=INFO
+            - --schedule=/tmp/celerybeat-schedule
+            - --pidfile=/tmp/celerybeat.pid
           envFrom:
             - configMapRef:
                 name: freelancing-runtime
