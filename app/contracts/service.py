@@ -131,6 +131,8 @@ def create_contract_from_accepted_proposal(
         resource_type="contract",
         resource_id=str(contract.id),
         actor_user_id=actor_user_id,
+        previous_state={"exists": False},
+        new_state=_contract_state(contract, version),
         metadata={
             "project_id": str(project.id),
             "proposal_id": str(proposal.id),
@@ -204,16 +206,6 @@ def sign_contract(
         idempotency_key_hash=key_hash,
     )
     db.session.add(signature)
-    record_audit_event(
-        action="contract.signed",
-        resource_type="contract",
-        resource_id=str(contract.id),
-        actor_user_id=user.id,
-        metadata={
-            "contract_version": version.version_number,
-            "document_hash": version.document_hash,
-        },
-    )
     try:
         db.session.flush()
     except IntegrityError as exc:
@@ -225,6 +217,19 @@ def sign_contract(
             "The contract signature was already recorded",
         ) from exc
 
+    record_audit_event(
+        action="contract.signed",
+        resource_type="contract",
+        resource_id=str(contract.id),
+        actor_user_id=user.id,
+        previous_state=_contract_state(contract, version, signer_has_signature=False),
+        new_state=_contract_state(contract, version, signer_has_signature=True),
+        metadata={
+            "contract_version": version.version_number,
+            "document_hash": version.document_hash,
+        },
+    )
+
     required_user_ids = {party.user_id for party in contract.parties if party.required_signature}
     signed_user_ids = set(
         db.session.scalars(
@@ -234,6 +239,7 @@ def sign_contract(
         )
     )
     if required_user_ids and required_user_ids <= signed_user_ids:
+        previous_state = _contract_state(contract, version)
         contract.status = "ACTIVE"
         contract.activated_at = datetime.now(UTC)
         record_audit_event(
@@ -241,6 +247,8 @@ def sign_contract(
             resource_type="contract",
             resource_id=str(contract.id),
             actor_user_id=user.id,
+            previous_state=previous_state,
+            new_state=_contract_state(contract, version),
             metadata={"contract_version": version.version_number},
         )
 
@@ -256,8 +264,8 @@ def cancel_contract(*, user: User, contract_id: uuid.UUID) -> Contract:
         )
     if contract.status == "CANCELLED":
         return get_contract(contract.id)
+    version = _current_contract_version(contract)
     if contract.status == "ACTIVE":
-        version = _current_contract_version(contract)
         if any(milestone.status != "CREATED" for milestone in version.milestones):
             raise ApiError(
                 "invalid_state",
@@ -284,6 +292,7 @@ def cancel_contract(*, user: User, contract_id: uuid.UUID) -> Contract:
                 "An active contract cannot be cancelled while a funding payment is pending",
             )
 
+    previous_state = _contract_state(contract, version)
     contract.status = "CANCELLED"
     contract.cancelled_at = datetime.now(UTC)
     record_audit_event(
@@ -291,6 +300,8 @@ def cancel_contract(*, user: User, contract_id: uuid.UUID) -> Contract:
         resource_type="contract",
         resource_id=str(contract.id),
         actor_user_id=user.id,
+        previous_state=previous_state,
+        new_state=_contract_state(contract, version),
     )
     db.session.commit()
     return get_contract(contract.id)
@@ -327,6 +338,22 @@ def _current_contract_version(contract: Contract) -> ContractVersion:
         if version.version_number == contract.current_version:
             return version
     raise RuntimeError("Contract current_version does not reference a loaded version")
+
+
+def _contract_state(
+    contract: Contract,
+    version: ContractVersion,
+    *,
+    signer_has_signature: bool | None = None,
+) -> dict[str, object]:
+    state: dict[str, object] = {
+        "status": contract.status,
+        "current_version": contract.current_version,
+        "document_hash": version.document_hash,
+    }
+    if signer_has_signature is not None:
+        state["signer_has_signature"] = signer_has_signature
+    return state
 
 
 def _milestone_terms(proposal_version: ProposalVersion) -> list[tuple[int, str, int, int]]:
