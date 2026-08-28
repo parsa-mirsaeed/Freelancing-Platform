@@ -54,17 +54,23 @@ def test_notification_retry_after_post_commit_publish_failure_is_idempotent(
         # _consume commits the durable notification and receipt before realtime
         # publication. Celery is configured to retry this OSError, so the next
         # worker attempt must treat the event as already consumed.
-        assert db.session.scalar(
-            select(func.count(Notification.id)).where(
-                Notification.user_id == user_id,
-                Notification.dedupe_key == "notification-retry-invariant",
+        assert (
+            db.session.scalar(
+                select(func.count(Notification.id)).where(
+                    Notification.user_id == user_id,
+                    Notification.dedupe_key == "notification-retry-invariant",
+                )
             )
-        ) == 1
-        assert db.session.scalar(
-            select(func.count(NotificationEventReceipt.id)).where(
-                NotificationEventReceipt.outbox_event_id == event_id
+            == 1
+        )
+        assert (
+            db.session.scalar(
+                select(func.count(NotificationEventReceipt.id)).where(
+                    NotificationEventReceipt.outbox_event_id == event_id
+                )
             )
-        ) == 1
+            == 1
+        )
 
         monkeypatch.setattr(
             "app.notifications.tasks.publish_notification",
@@ -72,14 +78,20 @@ def test_notification_retry_after_post_commit_publish_failure_is_idempotent(
         )
         assert drain_notification_outbox.run(limit=100) == 0
         assert publish_attempts == 1
-        assert db.session.scalar(
-            select(func.count(Notification.id)).where(
-                Notification.user_id == user_id,
-                Notification.dedupe_key == "notification-retry-invariant",
+        assert (
+            db.session.scalar(
+                select(func.count(Notification.id)).where(
+                    Notification.user_id == user_id,
+                    Notification.dedupe_key == "notification-retry-invariant",
+                )
             )
-        ) == 1
-        assert db.session.scalar(
-            select(func.count(NotificationEventReceipt.id)).where(
-                NotificationEventReceipt.outbox_event_id == event_id
+            == 1
+        )
+        assert (
+            db.session.scalar(
+                select(func.count(NotificationEventReceipt.id)).where(
+                    NotificationEventReceipt.outbox_event_id == event_id
+                )
             )
-        ) == 1
+            == 1
+        )
