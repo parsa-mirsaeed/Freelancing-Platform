@@ -3,6 +3,7 @@ from __future__ import annotations
 from celery import shared_task
 from flask import current_app
 
+from app.payments.models import ReconciliationRun
 from app.payments.providers.base import ProviderTemporaryError
 from app.payments.service import reconcile_provider
 
@@ -38,11 +39,11 @@ def reconcile_default_provider_task() -> dict[str, object]:
     return _serialize_reconciliation_run(run)
 
 
-def _serialize_reconciliation_run(run: object) -> dict[str, object]:
+def _serialize_reconciliation_run(run: ReconciliationRun) -> dict[str, object]:
     return {
-        "reconciliation_run_id": str(getattr(run, "id")),
-        "provider": getattr(run, "provider"),
-        "status": getattr(run, "status"),
-        "checked_count": getattr(run, "checked_count"),
-        "discrepancy_count": getattr(run, "discrepancy_count"),
+        "reconciliation_run_id": str(run.id),
+        "provider": run.provider,
+        "status": run.status,
+        "checked_count": run.checked_count,
+        "discrepancy_count": run.discrepancy_count,
     }
