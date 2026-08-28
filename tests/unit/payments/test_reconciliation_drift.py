@@ -54,7 +54,8 @@ def test_remote_capture_is_reported_without_bypassing_signed_webhook(
 
 
 def test_terminal_remote_refund_is_reported_without_reconciliation_mutation(
-    client, monkeypatch: pytest.MonkeyPatch  # type: ignore[no-untyped-def]
+    client,
+    monkeypatch: pytest.MonkeyPatch,  # type: ignore[no-untyped-def]
 ) -> None:
     employer, _freelancer, _project, milestone_id = _active_contract_with_milestone(
         client, suffix="reconcile-pending-refund"
