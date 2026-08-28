@@ -5,7 +5,7 @@ from flask import current_app
 
 from app.payments.models import ReconciliationRun
 from app.payments.providers.base import ProviderTemporaryError
-from app.payments.service import reconcile_provider
+from app.payments.reconciliation import reconcile_provider
 
 
 @shared_task(
