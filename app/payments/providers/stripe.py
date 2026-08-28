@@ -386,7 +386,7 @@ class StripePaymentProvider:
                 502,
                 f"Stripe response has an invalid {key}",
             )
-        return value
+        return int(value)
 
     @staticmethod
     def _provider_call(operation: str, request: Callable[[], Any]) -> Any:
