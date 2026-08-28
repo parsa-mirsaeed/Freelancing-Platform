@@ -136,9 +136,7 @@ def test_financial_metrics_are_derived_from_deduplicated_database_state(client, 
 
     text = client.get("/internal/metrics").get_data(as_text=True)
     assert 'payment_events_total{outcome="captured",provider="sandbox"} 1' in text
-    assert (
-        'payment_reconciliation_runs_total{provider="sandbox",status="mismatch"} 1' in text
-    )
+    assert 'payment_reconciliation_runs_total{provider="sandbox",status="mismatch"} 1' in text
     assert 'payment_reconciliation_mismatches_total{provider="sandbox"} 2' in text
 
 
