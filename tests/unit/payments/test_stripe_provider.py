@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -137,9 +138,11 @@ def test_stripe_webhook_maps_checkout_success_to_provider_neutral_capture(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     provider = _provider(FakeStripeClient())
+    created = 1_700_000_000
     event = {
         "id": "evt_123",
         "type": "checkout.session.completed",
+        "created": created,
         "data": {
             "object": {
                 "id": "cs_test_123",
@@ -158,6 +161,7 @@ def test_stripe_webhook_maps_checkout_success_to_provider_neutral_capture(
     verified = provider.verify_webhook(payload=b"{}", signature="t=1,v1=test")
     assert verified.external_event_id == "evt_123"
     assert verified.event_type == "payment.captured"
+    assert verified.occurred_at == datetime.fromtimestamp(created, tz=UTC)
     assert verified.data == {
         "provider_reference": "cs_test_123",
         "amount_minor": 1250,
