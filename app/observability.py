@@ -53,9 +53,9 @@ _duration_counts: defaultdict[tuple[str, str], list[int]] = defaultdict(
 _duration_sums: defaultdict[tuple[str, str], float] = defaultdict(float)
 _counter_values: defaultdict[str, Counter[tuple[tuple[str, str], ...]]] = defaultdict(Counter)
 _gauge_values: defaultdict[str, dict[tuple[tuple[str, str], ...], float]] = defaultdict(dict)
-_histogram_counts: defaultdict[
-    tuple[str, tuple[tuple[str, str], ...]], list[int]
-] = defaultdict(list)
+_histogram_counts: defaultdict[tuple[str, tuple[tuple[str, str], ...]], list[int]] = defaultdict(
+    list
+)
 _histogram_sums: defaultdict[tuple[str, tuple[tuple[str, str], ...]], float] = defaultdict(float)
 _observed_engines: WeakSet[Engine] = WeakSet()
 _engine_lock = threading.Lock()
@@ -585,9 +585,7 @@ def _sample(
 
 
 def _labels(**values: str) -> str:
-    return ",".join(
-        f'{key}="{_clean_label(value)}"' for key, value in sorted(values.items())
-    )
+    return ",".join(f'{key}="{_clean_label(value)}"' for key, value in sorted(values.items()))
 
 
 def _clean_label(value: str) -> str:
