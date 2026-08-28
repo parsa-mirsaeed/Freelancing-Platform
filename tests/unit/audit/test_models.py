@@ -54,6 +54,26 @@ def test_record_audit_event_hashes_existing_before_after_metadata(app) -> None: 
         assert event.new_state_hash == audit_state_hash(after)
 
 
+def test_high_risk_audit_action_requires_both_states(app) -> None:  # type: ignore[no-untyped-def]
+    with app.app_context(), pytest.raises(ValueError, match="requires previous and new state"):
+        record_audit_event(
+            action="milestone.released",
+            resource_type="milestone",
+            previous_state={"status": "APPROVED"},
+        )
+
+
+def test_low_risk_audit_action_may_omit_state_hashes(app) -> None:  # type: ignore[no-untyped-def]
+    with app.app_context():
+        event = record_audit_event(
+            action="identity.session_refreshed",
+            resource_type="session",
+        )
+        db.session.commit()
+        assert event.previous_state_hash is None
+        assert event.new_state_hash is None
+
+
 def test_audit_event_is_immutable(app) -> None:  # type: ignore[no-untyped-def]
     with app.app_context():
         event = AuditEvent(action="test", resource_type="unit", metadata_json={})
