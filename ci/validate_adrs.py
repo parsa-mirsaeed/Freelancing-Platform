@@ -52,9 +52,7 @@ def validate_required_adrs(root: Path = ADR_ROOT) -> list[str]:
 
         previous = seen_numbers.get(filename_number)
         if previous is not None:
-            errors.append(
-                f"duplicate ADR-{filename_number:04d} identifier: {previous} and {path}"
-            )
+            errors.append(f"duplicate ADR-{filename_number:04d} identifier: {previous} and {path}")
         else:
             seen_numbers[filename_number] = path
 
