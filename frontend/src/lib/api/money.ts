@@ -1,7 +1,8 @@
 import type { ContractStatus, MemberRole, MilestoneStatus } from "@/lib/api/contracts";
 import { productJson } from "@/lib/api/product-client";
 
-export const CURRENT_PAYMENT_PROVIDER = "sandbox";
+export const CURRENT_PAYMENT_PROVIDER =
+  process.env.NEXT_PUBLIC_PAYMENT_PROVIDER?.trim().toLowerCase() || undefined;
 
 export interface MilestoneFinancialState {
   milestone_id: string;
@@ -20,6 +21,16 @@ export interface PaymentIntentResult {
   amount_minor: number;
   currency: string;
   status: string;
+}
+
+export interface PaymentActionResult {
+  payment_intent_id: string;
+  provider: string;
+  status: string;
+  action: null | {
+    kind: "redirect" | string;
+    redirect_url: string;
+  };
 }
 
 export interface RefundResult {
@@ -105,9 +116,13 @@ export function mutateMilestoneFinancials(
     headers: { "Idempotency-Key": idempotencyKey },
     body:
       action === "fund" || action === "refund"
-        ? JSON.stringify({ provider: CURRENT_PAYMENT_PROVIDER })
+        ? JSON.stringify(CURRENT_PAYMENT_PROVIDER ? { provider: CURRENT_PAYMENT_PROVIDER } : {})
         : undefined,
   });
+}
+
+export function getPaymentAction(paymentIntentId: string): Promise<PaymentActionResult> {
+  return productJson<PaymentActionResult>(`payment-intents/${paymentIntentId}/action`);
 }
 
 export function getWallet(signal?: AbortSignal): Promise<WalletBalances> {
@@ -129,7 +144,7 @@ export function requestPayout({
     body: JSON.stringify({
       amount_minor: amountMinor,
       currency,
-      provider: CURRENT_PAYMENT_PROVIDER,
+      ...(CURRENT_PAYMENT_PROVIDER ? { provider: CURRENT_PAYMENT_PROVIDER } : {}),
     }),
   });
 }

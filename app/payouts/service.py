@@ -19,8 +19,10 @@ from app.ledger.service import (
 )
 from app.payments.idempotency import claim_idempotency, complete_idempotency
 from app.payments.models import FinancialIdempotencyKey
+from app.payments.providers.base import ProviderTemporaryError
 from app.payments.providers.registry import get_provider
 from app.payouts.models import Payout
+from app.payouts.provider_accounts import resolve_payout_destination
 
 
 def create_payout(
@@ -59,7 +61,12 @@ def create_payout(
         terminal = _complete_terminal_replay(payout, idem)
         if terminal is not None:
             return terminal
+        _upgrade_legacy_destination_snapshot(payout)
     else:
+        provider_destination_reference = resolve_payout_destination(
+            freelancer_user_id=user.id,
+            provider_name=provider_name,
+        )
         wallet = db.session.scalar(
             select(LedgerAccount)
             .where(
@@ -93,6 +100,7 @@ def create_payout(
             idempotency_key_id=idem.id,
             journal_transaction_id=journal.id,
             provider=provider_name,
+            provider_destination_reference=provider_destination_reference,
             amount_minor=amount_minor,
             currency=currency,
             status="PENDING",
@@ -112,18 +120,28 @@ def create_payout(
         )
         db.session.commit()
 
+    destination = payout.provider_destination_reference
+    if destination is None:
+        raise RuntimeError("Pending payout is missing its provider destination snapshot")
+    payout_id = payout.id
     provider = get_provider(payout.provider)
     try:
         result = provider.payout(
-            user_reference=str(user.id),
+            user_reference=destination,
             amount_minor=payout.amount_minor,
             currency=payout.currency,
             idempotency_key=idempotency_key,
         )
+    except ProviderTemporaryError as exc:
+        db.session.rollback()
+        persisted = db.session.get(Payout, payout_id)
+        if persisted is None:
+            raise RuntimeError("Reserved payout disappeared") from exc
+        return _pending_payout_body(persisted), 503
     except Exception:
-        return _fail_payout(payout.id, actor_user_id=user.id)
+        return _fail_payout(payout_id, actor_user_id=user.id)
 
-    payout = db.session.scalar(select(Payout).where(Payout.id == payout.id).with_for_update())
+    payout = db.session.scalar(select(Payout).where(Payout.id == payout_id).with_for_update())
     if payout is None:
         raise RuntimeError("Reserved payout disappeared")
     if payout.status != "PENDING":
@@ -164,6 +182,15 @@ def create_payout(
     complete_idempotency(persisted_idem, status=200, body=body)
     db.session.commit()
     return body, 200
+
+
+def _upgrade_legacy_destination_snapshot(payout: Payout) -> None:
+    if payout.provider_destination_reference is not None:
+        return
+    if payout.provider != "sandbox":
+        raise RuntimeError("Real-provider payout is missing its immutable destination snapshot")
+    payout.provider_destination_reference = str(payout.freelancer_user_id)
+    db.session.commit()
 
 
 def _complete_terminal_replay(
@@ -238,6 +265,16 @@ def _fail_payout(
     complete_idempotency(persisted_idem, status=502, body=body)
     db.session.commit()
     return body, 502
+
+
+def _pending_payout_body(payout: Payout) -> dict[str, object]:
+    return {
+        "type": "payment_provider_temporarily_unavailable",
+        "title": "Payment provider temporarily unavailable",
+        "status": 503,
+        "detail": "Payout outcome is unknown; retry with the same Idempotency-Key",
+        "payout_id": str(payout.id),
+    }
 
 
 def _failed_payout_body(payout: Payout) -> dict[str, object]:

@@ -1,0 +1,63 @@
+.panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  background: var(--surface);
+}
+
+.heading {
+  display: grid;
+  gap: 4px;
+}
+
+.heading strong {
+  font-size: 0.92rem;
+}
+
+.heading span,
+.note {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.element {
+  min-height: 110px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.actions button {
+  min-height: 44px;
+  border: 1px solid var(--ink);
+  border-radius: 12px;
+  padding: 0 16px;
+  background: var(--ink);
+  color: white;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.error {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, #c7423a 36%, var(--border));
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, #c7423a 8%, var(--surface));
+  color: #9a2f29;
+  font-size: 0.84rem;
+}

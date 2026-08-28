@@ -16,6 +16,7 @@ import {
 import { formatMinorMoney } from "@/lib/intl";
 
 import styles from "./money.module.css";
+import { StripePayment } from "./stripe-payment";
 
 function statusLabel(value: string): string {
   return value.replaceAll("_", " ");
@@ -45,7 +46,7 @@ function actionLabel(action: FinancialAction): string {
 
 function confirmationCopy(action: FinancialAction, amount: string, title: string): string {
   if (action === "fund") {
-    return `Fund ${amount} for “${title}”? The backend will create an idempotent payment request. Escrow is not treated as funded until provider capture is confirmed.`;
+    return `Fund ${amount} for “${title}”? The backend will create or reuse one idempotent provider payment. Escrow is not treated as funded until provider capture is confirmed.`;
   }
   if (action === "release") {
     return `Release ${amount} for “${title}”? The backend will atomically move fully funded escrow to the freelancer wallet and platform commission ledger accounts.`;
@@ -67,6 +68,7 @@ export function MilestoneMoney({
   const [financial, setFinancial] = useState<MilestoneFinancialState | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingFunding, setPendingFunding] = useState(false);
+  const [stripePaymentIntentId, setStripePaymentIntentId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<FinancialAction | "refresh" | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -79,6 +81,7 @@ export function MilestoneMoney({
         setFinancial(next);
         if (next.milestone_status !== "CREATED" || next.escrow_balance_minor > 0) {
           setPendingFunding(false);
+          setStripePaymentIntentId(null);
         }
         setError("");
         setLoading(false);
@@ -96,8 +99,13 @@ export function MilestoneMoney({
     setFinancial(next);
     if (next.milestone_status !== "CREATED" || next.escrow_balance_minor > 0) {
       setPendingFunding(false);
+      setStripePaymentIntentId(null);
     }
     return next;
+  }
+
+  async function refreshAfterProviderConfirmation() {
+    await Promise.all([refreshFinancials(), onAuthoritativeMutation()]);
   }
 
   async function manuallyRefresh() {
@@ -105,7 +113,7 @@ export function MilestoneMoney({
     setError("");
     setMessage("");
     try {
-      await Promise.all([refreshFinancials(), onAuthoritativeMutation()]);
+      await refreshAfterProviderConfirmation();
       setMessage("Financial and milestone state refreshed from the backend.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to refresh financial state.");
@@ -147,14 +155,21 @@ export function MilestoneMoney({
       idempotencyKeys.current[action] = undefined;
       if (action === "fund" && isPaymentIntent(result) && result.status === "PENDING") {
         setPendingFunding(true);
+        setStripePaymentIntentId(result.provider === "stripe" ? result.payment_intent_id : null);
       }
-      await Promise.all([refreshFinancials(), onAuthoritativeMutation()]);
+      await refreshAfterProviderConfirmation();
       if (action === "fund") {
-        setMessage(
-          isPaymentIntent(result) && result.status === "CAPTURED"
-            ? `Backend confirmed ${amount} in funded escrow.`
-            : `Funding request accepted for ${amount}. Escrow remains pending until provider capture is confirmed.`,
-        );
+        if (isPaymentIntent(result)) {
+          setMessage(
+            result.status === "CAPTURED"
+              ? `Backend confirmed ${amount} in funded escrow.`
+              : result.provider === "stripe"
+                ? `Stripe funding is ready for ${amount}. Complete the secure payment form below; escrow remains pending until the signed webhook is processed.`
+                : `Funding request accepted for ${amount}. Escrow remains pending until provider capture is confirmed.`,
+          );
+        } else {
+          setMessage(`Funding state refreshed for ${amount}.`);
+        }
       } else if (action === "release") {
         setMessage(`Backend confirmed release of ${amount}.`);
       } else {
@@ -247,6 +262,13 @@ export function MilestoneMoney({
         </p>
       ) : null}
 
+      {stripePaymentIntentId ? (
+        <StripePayment
+          paymentIntentId={stripePaymentIntentId}
+          onProviderConfirmation={refreshAfterProviderConfirmation}
+        />
+      ) : null}
+
       <div className={styles.moneyActions} aria-label={`Money actions for ${milestone.title}`}>
         {actions.map((action) => (
           <button
@@ -269,7 +291,7 @@ export function MilestoneMoney({
         </button>
       </div>
 
-      {!actions.length ? (
+      {!actions.length && !stripePaymentIntentId ? (
         <p className={styles.authorityNote}>
           No financial mutation is available for this role and backend-aligned milestone state.
         </p>

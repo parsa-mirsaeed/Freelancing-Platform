@@ -5,6 +5,7 @@ import binascii
 import hashlib
 import os
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 FEATURE_FLAG_NAMES = (
     "new_payment_flow",
@@ -14,6 +15,10 @@ FEATURE_FLAG_NAMES = (
     "new_dispute_engine",
 )
 _DEVELOPMENT_SECRET_KEY = "-".join(("development", "only", "change", "me"))
+_DEVELOPMENT_PAYMENT_WEBHOOK_SECRET = "-".join(
+    ("development", "only", "payment", "webhook", "secret")
+)
+_SUPPORTED_PAYMENT_PROVIDERS = {"sandbox", "stripe"}
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -65,6 +70,21 @@ def _validate_pii_encryption_keys(value: str) -> None:
         _validate_base64_key(f"PII encryption key {key_id}", encoded_key)
 
 
+def _validate_checkout_url(name: str, value: str, *, production: bool) -> None:
+    try:
+        parsed = urlsplit(value)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be an absolute HTTP(S) URL") from exc
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise RuntimeError(f"{name} must be an absolute HTTP(S) URL")
+    if parsed.username or parsed.password:
+        raise RuntimeError(f"{name} must not contain embedded credentials")
+    if parsed.fragment:
+        raise RuntimeError(f"{name} must not contain a URL fragment")
+    if production and parsed.scheme != "https":
+        raise RuntimeError(f"{name} must use HTTPS in production")
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     environment: str
@@ -77,6 +97,14 @@ class Settings:
     refresh_token_ttl_seconds: int
     pii_encryption_keys: str
     pii_lookup_key: str
+    payment_default_provider: str
+    payment_runtime_enabled: bool
+    payment_webhook_secret: str
+    stripe_secret_key: str
+    stripe_webhook_secret: str
+    stripe_checkout_success_url: str
+    stripe_checkout_cancel_url: str
+    stripe_max_network_retries: int
     max_content_length: int
     cors_allowed_origins: tuple[str, ...]
     rate_limit_enabled: bool
@@ -97,8 +125,37 @@ class Settings:
         }
         pii_encryption_keys = os.getenv("PII_ENCRYPTION_KEYS", "").strip()
         pii_lookup_key = os.getenv("PII_LOOKUP_KEY", "").strip()
+        payment_default_provider = (
+            os.getenv(
+                "PAYMENT_DEFAULT_PROVIDER",
+                "stripe" if environment == "production" else "sandbox",
+            )
+            .strip()
+            .casefold()
+        )
+        payment_runtime_enabled = _env_bool(
+            "PAYMENT_RUNTIME_ENABLED",
+            default=environment != "production",
+        )
+        payment_webhook_secret = os.getenv(
+            "PAYMENT_WEBHOOK_SECRET", _DEVELOPMENT_PAYMENT_WEBHOOK_SECRET
+        ).strip()
+        stripe_secret_key = os.getenv("STRIPE_SECRET_KEY", "").strip()
+        stripe_webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+        stripe_checkout_success_url = os.getenv("STRIPE_CHECKOUT_SUCCESS_URL", "").strip()
+        stripe_checkout_cancel_url = os.getenv("STRIPE_CHECKOUT_CANCEL_URL", "").strip()
+        stripe_max_network_retries = int(os.getenv("STRIPE_MAX_NETWORK_RETRIES", "2"))
 
-        if environment == "production":
+        if payment_default_provider not in _SUPPORTED_PAYMENT_PROVIDERS:
+            raise RuntimeError(
+                "PAYMENT_DEFAULT_PROVIDER must be one of: "
+                + ", ".join(sorted(_SUPPORTED_PAYMENT_PROVIDERS))
+            )
+        if stripe_max_network_retries < 0 or stripe_max_network_retries > 5:
+            raise RuntimeError("STRIPE_MAX_NETWORK_RETRIES must be between 0 and 5")
+
+        production = environment == "production"
+        if production:
             if secret_key == _DEVELOPMENT_SECRET_KEY:
                 raise RuntimeError("SECRET_KEY must be configured in production")
             if "*" in cors_allowed_origins:
@@ -107,6 +164,27 @@ class Settings:
                 raise RuntimeError("PII_ENCRYPTION_KEYS must be configured in production")
             if not pii_lookup_key:
                 raise RuntimeError("PII_LOOKUP_KEY must be configured in production")
+            if payment_runtime_enabled:
+                if payment_default_provider == "sandbox":
+                    raise RuntimeError(
+                        "PAYMENT_DEFAULT_PROVIDER cannot be sandbox when production "
+                        "payments are enabled"
+                    )
+                if payment_default_provider == "stripe":
+                    missing = [
+                        name
+                        for name, value in (
+                            ("STRIPE_SECRET_KEY", stripe_secret_key),
+                            ("STRIPE_WEBHOOK_SECRET", stripe_webhook_secret),
+                            ("STRIPE_CHECKOUT_SUCCESS_URL", stripe_checkout_success_url),
+                            ("STRIPE_CHECKOUT_CANCEL_URL", stripe_checkout_cancel_url),
+                        )
+                        if not value
+                    ]
+                    if missing:
+                        raise RuntimeError(
+                            "Stripe production configuration is incomplete: " + ", ".join(missing)
+                        )
         else:
             if not pii_encryption_keys:
                 pii_encryption_keys = "local-v1:" + _derived_local_key(
@@ -115,6 +193,18 @@ class Settings:
             if not pii_lookup_key:
                 pii_lookup_key = _derived_local_key(secret_key, purpose="pii-lookup-local-v1")
 
+        if stripe_checkout_success_url:
+            _validate_checkout_url(
+                "STRIPE_CHECKOUT_SUCCESS_URL",
+                stripe_checkout_success_url,
+                production=production,
+            )
+        if stripe_checkout_cancel_url:
+            _validate_checkout_url(
+                "STRIPE_CHECKOUT_CANCEL_URL",
+                stripe_checkout_cancel_url,
+                production=production,
+            )
         _validate_pii_encryption_keys(pii_encryption_keys)
         _validate_base64_key("PII_LOOKUP_KEY", pii_lookup_key)
         if max_content_length <= 0:
@@ -140,11 +230,19 @@ class Settings:
             refresh_token_ttl_seconds=int(os.getenv("REFRESH_TOKEN_TTL_SECONDS", "2592000")),
             pii_encryption_keys=pii_encryption_keys,
             pii_lookup_key=pii_lookup_key,
+            payment_default_provider=payment_default_provider,
+            payment_runtime_enabled=payment_runtime_enabled,
+            payment_webhook_secret=payment_webhook_secret,
+            stripe_secret_key=stripe_secret_key,
+            stripe_webhook_secret=stripe_webhook_secret,
+            stripe_checkout_success_url=stripe_checkout_success_url,
+            stripe_checkout_cancel_url=stripe_checkout_cancel_url,
+            stripe_max_network_retries=stripe_max_network_retries,
             max_content_length=max_content_length,
             cors_allowed_origins=cors_allowed_origins,
             rate_limit_enabled=_env_bool(
                 "RATE_LIMIT_ENABLED",
-                default=environment == "production",
+                default=production,
             ),
             rate_limit_per_minute=rate_limit_per_minute,
             log_json=_env_bool("LOG_JSON", default=True),
@@ -164,6 +262,14 @@ class Settings:
             "REFRESH_TOKEN_TTL_SECONDS": self.refresh_token_ttl_seconds,
             "PII_ENCRYPTION_KEYS": self.pii_encryption_keys,
             "PII_LOOKUP_KEY": self.pii_lookup_key,
+            "PAYMENT_DEFAULT_PROVIDER": self.payment_default_provider,
+            "PAYMENT_RUNTIME_ENABLED": self.payment_runtime_enabled,
+            "PAYMENT_WEBHOOK_SECRET": self.payment_webhook_secret,
+            "STRIPE_SECRET_KEY": self.stripe_secret_key,
+            "STRIPE_WEBHOOK_SECRET": self.stripe_webhook_secret,
+            "STRIPE_CHECKOUT_SUCCESS_URL": self.stripe_checkout_success_url,
+            "STRIPE_CHECKOUT_CANCEL_URL": self.stripe_checkout_cancel_url,
+            "STRIPE_MAX_NETWORK_RETRIES": self.stripe_max_network_retries,
             "MAX_CONTENT_LENGTH": self.max_content_length,
             "CORS_ALLOWED_ORIGINS": self.cors_allowed_origins,
             "RATE_LIMIT_ENABLED": self.rate_limit_enabled,

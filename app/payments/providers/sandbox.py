@@ -3,16 +3,21 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import os
 
 from app.errors import ApiError
-from app.payments.providers.base import ProviderResult, VerifiedWebhook
+from app.payments.providers.base import PaymentAction, ProviderResult, VerifiedWebhook
+
+_DEVELOPMENT_WEBHOOK_SECRET = "development-only-payment-webhook-secret"  # nosec B105 - deterministic local/CI fixture, never a production credential
 
 
 class SandboxPaymentProvider:
     """Deterministic no-network adapter for local development and CI."""
 
     name = "sandbox"
+    webhook_signature_header = "X-Payment-Signature"
+
+    def __init__(self, *, webhook_secret: str = _DEVELOPMENT_WEBHOOK_SECRET) -> None:
+        self._webhook_secret = webhook_secret
 
     def create_payment(
         self, *, amount_minor: int, currency: str, idempotency_key: str
@@ -29,6 +34,10 @@ class SandboxPaymentProvider:
         amount_minor, currency = self._parse_payment_reference(reference)
         return ProviderResult(reference, "CAPTURED", amount_minor, currency)
 
+    def get_payment_action(self, *, reference: str) -> PaymentAction | None:
+        self._parse_payment_reference(reference)
+        return None
+
     def refund(
         self, *, reference: str, amount_minor: int, currency: str, idempotency_key: str
     ) -> ProviderResult:
@@ -40,6 +49,20 @@ class SandboxPaymentProvider:
             amount_minor=amount_minor,
             currency=currency,
         )
+
+    def verify_refund(self, *, reference: str) -> ProviderResult:
+        amount_minor, currency = self._parse_refund_reference(reference)
+        return ProviderResult(reference, "SUCCEEDED", amount_minor, currency)
+
+    def validate_payout_destination(self, *, reference: str) -> str:
+        if not reference:
+            raise ApiError(
+                "payout_destination_invalid",
+                "Invalid payout destination",
+                422,
+                "Sandbox payout destination is required",
+            )
+        return reference
 
     def payout(
         self, *, user_reference: str, amount_minor: int, currency: str, idempotency_key: str
@@ -57,8 +80,11 @@ class SandboxPaymentProvider:
         return self.verify_payment(reference=reference)
 
     def verify_webhook(self, *, payload: bytes, signature: str) -> VerifiedWebhook:
-        secret = os.getenv("PAYMENT_WEBHOOK_SECRET", "development-only-payment-webhook-secret")
-        expected = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+        expected = hmac.new(
+            self._webhook_secret.encode("utf-8"),
+            payload,
+            hashlib.sha256,
+        ).hexdigest()
         if not hmac.compare_digest(expected, signature):
             raise ApiError(
                 "invalid_webhook_signature",
@@ -120,5 +146,26 @@ class SandboxPaymentProvider:
                 "Invalid provider reference",
                 502,
                 "Sandbox payment reference contains an invalid amount",
+            ) from exc
+        return amount_minor, parts[3]
+
+    @staticmethod
+    def _parse_refund_reference(reference: str) -> tuple[int, str]:
+        parts = reference.split("_")
+        if len(parts) != 5 or parts[:2] != ["sandbox", "refund"]:
+            raise ApiError(
+                "provider_reference_invalid",
+                "Invalid provider reference",
+                502,
+                "Sandbox refund reference could not be verified",
+            )
+        try:
+            amount_minor = int(parts[2])
+        except ValueError as exc:
+            raise ApiError(
+                "provider_reference_invalid",
+                "Invalid provider reference",
+                502,
+                "Sandbox refund reference contains an invalid amount",
             ) from exc
         return amount_minor, parts[3]
