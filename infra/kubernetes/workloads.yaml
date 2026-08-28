@@ -117,6 +117,80 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: celery-beat
+  namespace: freelancing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-beat
+  template:
+    metadata:
+      labels:
+        app: celery-beat
+        freelancing.io/worker: "true"
+    spec:
+      serviceAccountName: freelancing-worker
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: beat
+          image: ghcr.io/parsa-mirsaeed/freelancing-platform:main
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - app.celery_worker.celery_app
+            - beat
+            - --loglevel=INFO
+            - --schedule=/tmp/celerybeat-schedule
+            - --pidfile=/tmp/celerybeat.pid
+          envFrom:
+            - configMapRef:
+                name: freelancing-runtime
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: secret-key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: redis-url
+          securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: celery-payments
   namespace: freelancing
 spec:
@@ -180,6 +254,79 @@ spec:
             limits:
               cpu: "1"
               memory: 768Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-reconciliation
+  namespace: freelancing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-reconciliation
+  template:
+    metadata:
+      labels:
+        app: celery-reconciliation
+        freelancing.io/worker: "true"
+    spec:
+      serviceAccountName: freelancing-worker
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: ghcr.io/parsa-mirsaeed/freelancing-platform:main
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - app.celery_worker.celery_app
+            - worker
+            - --loglevel=INFO
+            - --queues=reconciliation
+          envFrom:
+            - configMapRef:
+                name: freelancing-runtime
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: secret-key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: freelancing-runtime-secrets
+                  key: redis-url
+          securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           volumeMounts:
             - name: tmp
               mountPath: /tmp

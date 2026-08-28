@@ -23,6 +23,8 @@ def create_celery_app(app: Flask) -> Celery:
             "worker_prefetch_multiplier": 1,
             "task_default_queue": "default",
             "task_routes": {
+                "payments.reconcile_provider": {"queue": "reconciliation"},
+                "payments.reconcile_default_provider": {"queue": "reconciliation"},
                 "notifications.*": {"queue": "notifications"},
                 "payments.*": {"queue": "payments"},
                 "search.*": {"queue": "search_index"},
@@ -43,6 +45,10 @@ def create_celery_app(app: Flask) -> Celery:
                     "task": "files.drain_scan_outbox",
                     "schedule": 2.0,
                     "args": (50,),
+                },
+                "reconcile-default-payment-provider": {
+                    "task": "payments.reconcile_default_provider",
+                    "schedule": 300.0,
                 },
             },
         }
