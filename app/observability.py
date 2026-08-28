@@ -22,8 +22,9 @@ from flask import (
     request,
 )
 from redis.exceptions import RedisError
-from sqlalchemy import event
+from sqlalchemy import event, func, select
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.extensions import db, redis_extension
 
@@ -71,7 +72,7 @@ class MetricSpec:
 _METRICS = {
     "socket_active_connections": MetricSpec(
         "gauge",
-        "Currently authenticated Socket.IO connections in this process.",
+        "Authenticated Socket.IO principals currently present in Redis.",
     ),
     "message_delivery_duration_seconds": MetricSpec(
         "histogram",
@@ -159,8 +160,6 @@ _METRICS = {
 _SHARED_COUNTERS = {
     "celery_task_failures_total",
     "celery_task_retries_total",
-    "payment_reconciliation_runs_total",
-    "payment_reconciliation_mismatches_total",
 }
 
 
@@ -260,21 +259,6 @@ def increment_shared_counter(name: str, amount: int = 1, **labels: str) -> None:
         return
     with _lock:
         _counter_values[name][key] += amount
-
-
-def set_gauge(name: str, value: float, **labels: str) -> None:
-    key = _metric_key(name, "gauge", labels)
-    with _lock:
-        _gauge_values[name][key] = float(value)
-
-
-def adjust_gauge(name: str, delta: float, *, floor: float | None = None, **labels: str) -> None:
-    key = _metric_key(name, "gauge", labels)
-    with _lock:
-        updated = _gauge_values[name].get(key, 0.0) + delta
-        if floor is not None:
-            updated = max(floor, updated)
-        _gauge_values[name][key] = updated
 
 
 def observe_histogram(name: str, value: float, **labels: str) -> None:
@@ -412,6 +396,7 @@ def metrics() -> Response:
                 f"{{{count_labels}}} {_duration_sums[(method, endpoint)]:.9f}"
             )
 
+    dynamic_counters = _dynamic_counters()
     dynamic_gauges = _dynamic_gauges()
     shared_counters = _read_shared_counters()
     with _lock:
@@ -420,8 +405,9 @@ def metrics() -> Response:
         local_histograms = {key: list(values) for key, values in _histogram_counts.items()}
         local_histogram_sums = dict(_histogram_sums)
 
-    for name, values in shared_counters.items():
-        local_counters.setdefault(name, Counter()).update(values)
+    for source in (shared_counters, dynamic_counters):
+        for name, values in source.items():
+            local_counters.setdefault(name, Counter()).update(values)
     for name, values in dynamic_gauges.items():
         local_gauges.setdefault(name, {}).update(values)
 
@@ -429,7 +415,7 @@ def metrics() -> Response:
         lines.extend([f"# HELP {name} {spec.help}", f"# TYPE {name} {spec.kind}"])
         if spec.kind == "counter":
             for labels, value in sorted(local_counters.get(name, {}).items()):
-                lines.append(_sample(name, labels, float(value)))
+                lines.append(_sample(name, labels, value))
         elif spec.kind == "gauge":
             for labels, value in sorted(local_gauges.get(name, {}).items()):
                 lines.append(_sample(name, labels, value))
@@ -447,10 +433,59 @@ def metrics() -> Response:
     return Response("\n".join(lines) + "\n", mimetype="text/plain")
 
 
-def _dynamic_gauges() -> dict[str, dict[tuple[tuple[str, str], ...], float]]:
-    values: dict[str, dict[tuple[tuple[str, str], ...], float]] = defaultdict(dict)
+def _dynamic_counters() -> dict[str, Counter[tuple[tuple[str, str], ...]]]:
+    result: dict[str, Counter[tuple[tuple[str, str], ...]]] = {}
     if not has_app_context():
-        return values
+        return result
+    from app.payments.models import ProviderEvent, ReconciliationRun
+
+    try:
+        payment_samples: Counter[tuple[tuple[str, str], ...]] = Counter()
+        rows = db.session.execute(
+            select(ProviderEvent.provider, ProviderEvent.event_type, func.count(ProviderEvent.id))
+            .where(ProviderEvent.processed_at.is_not(None))
+            .group_by(ProviderEvent.provider, ProviderEvent.event_type)
+        )
+        for provider, event_type, count in rows:
+            outcome = (
+                "captured"
+                if event_type == "payment.captured"
+                else "failed"
+                if event_type == "payment.failed"
+                else "ignored"
+            )
+            payment_samples[(('provider', str(provider)), ('outcome', outcome))] += int(count)
+        result["payment_events_total"] = payment_samples
+
+        run_samples: Counter[tuple[tuple[str, str], ...]] = Counter()
+        rows = db.session.execute(
+            select(ReconciliationRun.provider, ReconciliationRun.status, func.count(ReconciliationRun.id))
+            .where(ReconciliationRun.status != "RUNNING")
+            .group_by(ReconciliationRun.provider, ReconciliationRun.status)
+        )
+        for provider, status, count in rows:
+            run_samples[(('provider', str(provider)), ('status', str(status).lower()))] = int(count)
+        result["payment_reconciliation_runs_total"] = run_samples
+
+        mismatch_samples: Counter[tuple[tuple[str, str], ...]] = Counter()
+        rows = db.session.execute(
+            select(ReconciliationRun.provider, func.sum(ReconciliationRun.discrepancy_count))
+            .where(ReconciliationRun.status != "RUNNING")
+            .group_by(ReconciliationRun.provider)
+        )
+        for provider, count in rows:
+            mismatch_samples[(('provider', str(provider)),)] = int(count or 0)
+        result["payment_reconciliation_mismatches_total"] = mismatch_samples
+    except SQLAlchemyError:
+        db.session.rollback()
+        return {}
+    return result
+
+
+def _dynamic_gauges() -> dict[str, dict[tuple[tuple[str, str], ...], float]]:
+    result: dict[str, dict[tuple[tuple[str, str], ...], float]] = defaultdict(dict)
+    if not has_app_context():
+        return result
     try:
         pool = db.engine.pool
         checkedout_fn = getattr(pool, "checkedout", None)
@@ -459,22 +494,25 @@ def _dynamic_gauges() -> dict[str, dict[tuple[tuple[str, str], ...], float]]:
         if callable(checkedout_fn) and callable(size_fn):
             checked_out = float(checkedout_fn())
             size = float(size_fn())
-            values["db_pool_checked_out"][()] = checked_out
-            values["db_pool_size"][()] = size
-            values["db_pool_utilization_ratio"][()] = checked_out / size if size > 0 else 0.0
+            result["db_pool_checked_out"][()] = checked_out
+            result["db_pool_size"][()] = size
+            result["db_pool_utilization_ratio"][()] = checked_out / size if size > 0 else 0.0
         if callable(overflow_fn):
-            values["db_pool_overflow"][()] = float(overflow_fn())
-    except Exception:
+            result["db_pool_overflow"][()] = float(overflow_fn())
+    except (AttributeError, TypeError, ValueError):
         pass
 
     try:
         client = redis_extension.get_client(current_app)
         for queue in _CELERY_QUEUES:
             key = (("queue", queue),)
-            values["celery_queue_depth"][key] = float(client.llen(queue))
+            result["celery_queue_depth"][key] = float(client.llen(queue))
+        result["socket_active_connections"][()] = float(
+            sum(1 for _ in client.scan_iter(match="socket-principal:*", count=500))
+        )
     except (RedisError, OSError):
         pass
-    return values
+    return result
 
 
 def _write_shared_counter(
