@@ -17,6 +17,7 @@ from stripe import (
 )
 
 from app.errors import ApiError
+from app.observability import observe_histogram
 from app.payments.providers.base import (
     PaymentAction,
     ProviderResult,
@@ -246,6 +247,24 @@ class StripePaymentProvider:
                 "Invalid webhook payload",
                 400,
                 "Stripe webhook event id and type are required",
+            )
+        if occurred_at is not None:
+            metric_event_type = (
+                stripe_event_type
+                if stripe_event_type
+                in {
+                    "checkout.session.completed",
+                    "checkout.session.async_payment_succeeded",
+                    "checkout.session.async_payment_failed",
+                    "checkout.session.expired",
+                }
+                else "other"
+            )
+            observe_histogram(
+                "payment_webhook_lag_seconds",
+                max(0.0, (datetime.now(UTC) - occurred_at).total_seconds()),
+                provider=self.name,
+                event_type=metric_event_type,
             )
 
         if stripe_event_type in {
