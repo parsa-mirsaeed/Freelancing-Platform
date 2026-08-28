@@ -41,7 +41,8 @@ def test_search_document_is_projection_of_postgres_state(
 
 
 def test_search_index_failure_preserves_postgres_state_and_retry_intent(
-    client, monkeypatch  # type: ignore[no-untyped-def]
+    client,
+    monkeypatch,  # type: ignore[no-untyped-def]
 ) -> None:
     freelancer = register_user(client, email="search-failure@example.com", role="freelancer")
     user_id = uuid.UUID(freelancer["user"]["id"])
